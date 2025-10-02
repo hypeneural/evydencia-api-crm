@@ -1,0 +1,11 @@
+﻿CREATE TABLE IF NOT EXISTS orders_map (
+    uuid CHAR(36) NOT NULL,
+    status VARCHAR(64) NULL,
+    notes VARCHAR(255) NULL,
+    data JSON NULL,
+    synced_at DATETIME NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (uuid),
+    INDEX idx_orders_map_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

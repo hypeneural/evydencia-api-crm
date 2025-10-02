@@ -1,0 +1,3 @@
+﻿/vendor/
+/.env
+/var/logs/*

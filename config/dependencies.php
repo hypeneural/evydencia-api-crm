@@ -1,0 +1,125 @@
+﻿<?php
+
+declare(strict_types=1);
+
+use App\\Application\\Services\\OrderService;
+use App\\Application\\Support\\ApiResponder;
+use App\\Application\\Support\\QueryMapper;
+use App\Domain\Repositories\OrderRepositoryInterface;
+use App\Infrastructure\Cache\RedisRateLimiter;
+use App\Infrastructure\Http\EvydenciaApiClient;
+use App\Infrastructure\Logging\LoggerFactory;
+use App\Infrastructure\Persistence\PdoOrderRepository;
+use App\Settings\Settings;
+use DI\ContainerBuilder;
+use GuzzleHttp\Client as HttpClient;
+use PDO;
+use Predis\Client as PredisClient;
+use Psr\Container\ContainerInterface;
+use Psr\Log\LoggerInterface;
+use function DI\get;
+
+return static function (ContainerBuilder $containerBuilder): void {
+    $containerBuilder->addDefinitions([
+        LoggerFactory::class => static function (ContainerInterface $container): LoggerFactory {
+            return new LoggerFactory($container->get(Settings::class));
+        },
+        LoggerInterface::class => static function (ContainerInterface $container): LoggerInterface {
+            /** @var LoggerFactory $factory */
+            $factory = $container->get(LoggerFactory::class);
+
+            return $factory->createLogger();
+        },
+        'db.connection' => static function (ContainerInterface $container): ?PDO {
+            $database = $container->get(Settings::class)->getDatabase();
+
+            if (empty($database['host']) || empty($database['database'])) {
+                return null;
+            }
+
+            $dsn = sprintf(
+                '%s:host=%s;port=%d;dbname=%s;charset=%s',
+                $database['driver'] ?? 'mysql',
+                $database['host'],
+                (int) ($database['port'] ?? 3306),
+                $database['database'],
+                $database['charset'] ?? 'utf8mb4'
+            );
+
+            $pdo = new PDO($dsn, $database['username'] ?? 'root', $database['password'] ?? '', $database['options'] ?? []);
+            $pdo->exec(sprintf('SET NAMES %s COLLATE %s', $database['charset'] ?? 'utf8mb4', $database['collation'] ?? 'utf8mb4_unicode_ci'));
+
+            return $pdo;
+        },
+        PdoOrderRepository::class => static function (ContainerInterface $container): PdoOrderRepository {
+            /** @var PDO|null $pdo */
+            $pdo = $container->get('db.connection');
+
+            return new PdoOrderRepository($pdo);
+        },
+        OrderRepositoryInterface::class => get(PdoOrderRepository::class),
+        'redis.client' => static function (ContainerInterface $container): ?PredisClient {
+            $redis = $container->get(Settings::class)->getRedis();
+
+            if (empty($redis['enabled'])) {
+                return null;
+            }
+
+            $parameters = [
+                'scheme' => 'tcp',
+                'host' => $redis['host'] ?? '127.0.0.1',
+                'port' => $redis['port'] ?? 6379,
+                'timeout' => $redis['timeout'] ?? 1.5,
+            ];
+
+            if (!empty($redis['password'])) {
+                $parameters['password'] = $redis['password'];
+            }
+
+            if (isset($redis['database'])) {
+                $parameters['database'] = $redis['database'];
+            }
+
+            return new PredisClient($parameters);
+        },
+        RedisRateLimiter::class => static function (ContainerInterface $container): RedisRateLimiter {
+            /** @var PredisClient|null $client */
+            $client = $container->get('redis.client');
+
+            return new RedisRateLimiter($client, $container->get(Settings::class));
+        },
+        HttpClient::class => static function (ContainerInterface $container): HttpClient {
+            $crm = $container->get(Settings::class)->getCrm();
+            $baseUrl = $crm['base_url'] ?? 'https://evydencia.com/api';
+            $baseUri = rtrim($baseUrl, '/') . '/';
+            $timeout = $crm['timeout'] ?? 30.0;
+
+            return new HttpClient([
+                'base_uri' => $baseUri,
+                'timeout' => $timeout,
+                'http_errors' => false,
+            ]);
+        },
+        QueryMapper::class => static function (): QueryMapper {
+            return new QueryMapper();
+        },
+        ApiResponder::class => static function (ContainerInterface $container): ApiResponder {
+            return new ApiResponder($container->get(Settings::class));
+        },
+        EvydenciaApiClient::class => static function (ContainerInterface $container): EvydenciaApiClient {
+            return new EvydenciaApiClient(
+                $container->get(HttpClient::class),
+                $container->get(Settings::class),
+                $container->get(LoggerInterface::class)
+            );
+        },
+        OrderService::class => static function (ContainerInterface $container): OrderService {
+            return new OrderService(
+                $container->get(EvydenciaApiClient::class),
+                $container->get(OrderRepositoryInterface::class),
+                $container->get(LoggerInterface::class)
+            );
+        },
+    ]);
+};
+
