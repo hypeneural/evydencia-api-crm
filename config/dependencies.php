@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
-use App\\Application\\Services\\OrderService;
-use App\\Application\\Support\\ApiResponder;
-use App\\Application\\Support\\QueryMapper;
+use App\Application\Services\CampaignService;
+use App\Application\Services\OrderService;
+use App\Application\Services\ReportService;
+use App\Application\Support\ApiResponder;
+use App\Application\Support\QueryMapper;
 use App\Domain\Repositories\OrderRepositoryInterface;
 use App\Infrastructure\Cache\RedisRateLimiter;
 use App\Infrastructure\Http\EvydenciaApiClient;
@@ -113,6 +115,18 @@ return static function (ContainerBuilder $containerBuilder): void {
                 $container->get(LoggerInterface::class)
             );
         },
+        ReportService::class => static function (ContainerInterface $container): ReportService {
+            return new ReportService(
+                $container->get(EvydenciaApiClient::class),
+                $container->get(LoggerInterface::class)
+            );
+        },
+        CampaignService::class => static function (ContainerInterface $container): CampaignService {
+            return new CampaignService(
+                $container->get(EvydenciaApiClient::class),
+                $container->get(LoggerInterface::class)
+            );
+        },
         OrderService::class => static function (ContainerInterface $container): OrderService {
             return new OrderService(
                 $container->get(EvydenciaApiClient::class),
@@ -122,4 +136,11 @@ return static function (ContainerBuilder $containerBuilder): void {
         },
     ]);
 };
+
+
+
+
+
+
+
 

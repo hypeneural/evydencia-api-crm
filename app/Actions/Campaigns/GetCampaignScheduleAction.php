@@ -2,11 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App\Actions\Orders;
+namespace App\Actions\Campaigns;
 
 use App\Actions\Concerns\HandlesListAction;
-use App\Application\DTO\QueryOptions;
-use App\Application\Services\OrderService;
+use App\Application\Services\CampaignService;
 use App\Application\Support\ApiResponder;
 use App\Application\Support\QueryMapper;
 use App\Domain\Exception\CrmRequestException;
@@ -17,12 +16,12 @@ use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
 
-final class SearchOrdersAction
+final class GetCampaignScheduleAction
 {
     use HandlesListAction;
 
     public function __construct(
-        private readonly OrderService $orderService,
+        private readonly CampaignService $campaignService,
         private readonly QueryMapper $queryMapper,
         private readonly ApiResponder $responder,
         private readonly LoggerInterface $logger
@@ -35,13 +34,13 @@ final class SearchOrdersAction
         $startedAt = microtime(true);
 
         try {
-            $options = $this->queryMapper->mapOrdersSearch($request->getQueryParams());
+            $options = $this->queryMapper->mapCampaignSchedule($request->getQueryParams());
         } catch (ValidationException $exception) {
             return $this->responder->validationError($response, $traceId, $exception->getErrors());
         }
 
         try {
-            $result = $this->orderService->searchOrders($options, $traceId);
+            $result = $this->campaignService->fetchSchedule($options, $traceId);
         } catch (CrmUnavailableException) {
             return $this->responder->badGateway($response, $traceId, 'CRM timeout');
         } catch (CrmRequestException $exception) {
@@ -51,12 +50,12 @@ final class SearchOrdersAction
                 sprintf('CRM error (status %d).', $exception->getStatusCode())
             );
         } catch (RuntimeException $exception) {
-            $this->logger->error('Unexpected error while searching orders', [
+            $this->logger->error('Unexpected error while fetching campaign schedule', [
                 'trace_id' => $traceId,
                 'error' => $exception->getMessage(),
             ]);
 
-            return $this->responder->internalError($response, $traceId, 'Unexpected error while searching orders.');
+            return $this->responder->internalError($response, $traceId, 'Unexpected error while fetching campaign schedule.');
         }
 
         $elapsedMs = (int) round((microtime(true) - $startedAt) * 1000);
@@ -70,7 +69,7 @@ final class SearchOrdersAction
             $meta,
             $links,
             $traceId,
-            'orders/search'
+            'campaigns/schedule/search'
         );
     }
 }

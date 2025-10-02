@@ -4,26 +4,20 @@ declare(strict_types=1);
 
 namespace App\Actions\Orders;
 
-use App\Actions\Concerns\HandlesListAction;
-use App\Application\DTO\QueryOptions;
 use App\Application\Services\OrderService;
 use App\Application\Support\ApiResponder;
-use App\Application\Support\QueryMapper;
 use App\Domain\Exception\CrmRequestException;
 use App\Domain\Exception\CrmUnavailableException;
-use App\Domain\Exception\ValidationException;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
+use Slim\Routing\RouteContext;
 
-final class SearchOrdersAction
+final class GetOrderDetailAction
 {
-    use HandlesListAction;
-
     public function __construct(
         private readonly OrderService $orderService,
-        private readonly QueryMapper $queryMapper,
         private readonly ApiResponder $responder,
         private readonly LoggerInterface $logger
     ) {
@@ -32,16 +26,16 @@ final class SearchOrdersAction
     public function __invoke(Request $request, Response $response): Response
     {
         $traceId = $this->resolveTraceId($request);
-        $startedAt = microtime(true);
+        $uuid = $this->resolveUuid($request);
 
-        try {
-            $options = $this->queryMapper->mapOrdersSearch($request->getQueryParams());
-        } catch (ValidationException $exception) {
-            return $this->responder->validationError($response, $traceId, $exception->getErrors());
+        if ($uuid === '') {
+            return $this->responder->validationError($response, $traceId, [
+                ['field' => 'uuid', 'message' => 'Identificador do pedido é obrigatório.'],
+            ]);
         }
 
         try {
-            $result = $this->orderService->searchOrders($options, $traceId);
+            $data = $this->orderService->fetchOrderDetail($uuid, $traceId);
         } catch (CrmUnavailableException) {
             return $this->responder->badGateway($response, $traceId, 'CRM timeout');
         } catch (CrmRequestException $exception) {
@@ -51,26 +45,39 @@ final class SearchOrdersAction
                 sprintf('CRM error (status %d).', $exception->getStatusCode())
             );
         } catch (RuntimeException $exception) {
-            $this->logger->error('Unexpected error while searching orders', [
+            $this->logger->error('Unexpected error while fetching order detail', [
                 'trace_id' => $traceId,
+                'uuid' => $uuid,
                 'error' => $exception->getMessage(),
             ]);
 
-            return $this->responder->internalError($response, $traceId, 'Unexpected error while searching orders.');
+            return $this->responder->internalError($response, $traceId, 'Unexpected error while fetching order detail.');
         }
 
-        $elapsedMs = (int) round((microtime(true) - $startedAt) * 1000);
-        $meta = $result['meta'];
-        $meta['elapsed_ms'] = $elapsedMs;
-        $links = $this->buildLinks($request, $options, $meta, $result['crm_links'] ?? []);
-
-        return $this->responder->successList(
+        return $this->responder->successResource(
             $response,
-            $result['data'],
-            $meta,
-            $links,
+            is_array($data) ? $data : ['data' => $data],
             $traceId,
-            'orders/search'
+            sprintf('orders/%s/detail', $uuid)
         );
+    }
+
+    private function resolveTraceId(Request $request): string
+    {
+        $traceId = $request->getAttribute('trace_id');
+
+        if (!is_string($traceId) || $traceId === '') {
+            $traceId = bin2hex(random_bytes(8));
+        }
+
+        return $traceId;
+    }
+
+    private function resolveUuid(Request $request): string
+    {
+        $route = RouteContext::fromRequest($request)->getRoute();
+        $uuid = $route?->getArgument('uuid');
+
+        return is_string($uuid) ? trim($uuid) : '';
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Application\Support\ApiResponder;
 use App\Middleware\ApiKeyMiddleware;
 use App\Middleware\RateLimitMiddleware;
+use App\Middleware\RequestLoggingMiddleware;
 use App\Settings\Settings;
 use Middlewares\TrailingSlash;
 use Psr\Http\Message\ResponseInterface;
@@ -28,6 +29,7 @@ return static function (App $app): void {
     $app->add(new TrailingSlash(false));
     $app->add($container->get(RateLimitMiddleware::class));
     $app->add($container->get(ApiKeyMiddleware::class));
+    $app->add($container->get(RequestLoggingMiddleware::class));
 
     /** @var Settings $settings */
     $settings = $container->get(Settings::class);
