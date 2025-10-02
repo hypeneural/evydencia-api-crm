@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
@@ -24,3 +24,4 @@ final class ValidationException extends RuntimeException
         return $this->errors;
     }
 }
+

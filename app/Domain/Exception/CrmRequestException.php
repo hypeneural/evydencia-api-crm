@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
@@ -29,3 +29,4 @@ final class CrmRequestException extends RuntimeException
         return $this->payload;
     }
 }
+

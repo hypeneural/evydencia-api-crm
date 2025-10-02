@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
@@ -30,7 +30,7 @@ final class GetOrderDetailAction
 
         if ($uuid === '') {
             return $this->responder->validationError($response, $traceId, [
-                ['field' => 'uuid', 'message' => 'Identificador do pedido é obrigatório.'],
+                ['field' => 'uuid', 'message' => 'Identificador do pedido e obrigatorio.'],
             ]);
         }
 
@@ -54,11 +54,14 @@ final class GetOrderDetailAction
             return $this->responder->internalError($response, $traceId, 'Unexpected error while fetching order detail.');
         }
 
+        $resource = is_array($data) ? $data : ['data' => $data];
+
         return $this->responder->successResource(
             $response,
-            is_array($data) ? $data : ['data' => $data],
+            $resource,
             $traceId,
-            sprintf('orders/%s/detail', $uuid)
+            ['source' => 'crm'],
+            ['self' => (string) $request->getUri()]
         );
     }
 
@@ -81,3 +84,4 @@ final class GetOrderDetailAction
         return is_string($uuid) ? trim($uuid) : '';
     }
 }
+

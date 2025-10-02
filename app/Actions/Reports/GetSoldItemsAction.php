@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
@@ -68,8 +68,8 @@ final class GetSoldItemsAction
             $result['data'],
             $meta,
             $links,
-            $traceId,
-            'reports/sold-items'
+            $traceId
         );
     }
 }
+

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
@@ -9,3 +9,4 @@ use RuntimeException;
 final class CrmUnavailableException extends RuntimeException
 {
 }
+

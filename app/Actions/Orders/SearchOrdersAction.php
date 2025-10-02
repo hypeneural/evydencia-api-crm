@@ -1,11 +1,10 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
 namespace App\Actions\Orders;
 
 use App\Actions\Concerns\HandlesListAction;
-use App\Application\DTO\QueryOptions;
 use App\Application\Services\OrderService;
 use App\Application\Support\ApiResponder;
 use App\Application\Support\QueryMapper;
@@ -69,8 +68,8 @@ final class SearchOrdersAction
             $result['data'],
             $meta,
             $links,
-            $traceId,
-            'orders/search'
+            $traceId
         );
     }
 }
+

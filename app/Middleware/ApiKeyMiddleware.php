@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
@@ -53,3 +53,4 @@ final class ApiKeyMiddleware implements MiddlewareInterface
         return $response->withHeader('WWW-Authenticate', 'ApiKey');
     }
 }
+

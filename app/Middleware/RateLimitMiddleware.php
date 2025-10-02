@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
@@ -85,3 +85,4 @@ final class RateLimitMiddleware implements MiddlewareInterface
         return $response;
     }
 }
+

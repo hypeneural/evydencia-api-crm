@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
@@ -132,19 +132,24 @@ trait HandlesListResults
             $totalPages = is_string($totalPages) ? (int) $totalPages : null;
         }
 
-        $page = (int) ($crmMeta['page'] ?? $crmMeta['current_page'] ?? $options->page);
-        $size = $options->size;
+        $page = (int) (
+            $crmMeta['page']
+            ?? $crmMeta['current_page']
+            ?? $options->page
+        );
 
-        if ($options->all) {
+        $perPage = $options->perPage;
+
+        if ($options->fetchAll) {
             $page = 1;
-            $size = $count;
             $totalItems = $totalItems ?? $count;
             $totalPages = 1;
         }
 
         return [
             'page' => $page,
-            'size' => $size,
+            'size' => $perPage,
+            'per_page' => $perPage,
             'count' => $count,
             'total_items' => $totalItems,
             'total_pages' => $totalPages,
@@ -216,3 +221,4 @@ trait HandlesListResults
         return strtotime($value) !== false;
     }
 }
+

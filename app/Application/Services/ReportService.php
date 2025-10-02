@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
@@ -17,6 +17,8 @@ final class ReportService
 {
     use HandlesListResults;
 
+    private const MAX_FETCH_PAGES = 20;
+
     public function __construct(
         private readonly EvydenciaApiClient $apiClient,
         private readonly LoggerInterface $logger
@@ -29,19 +31,23 @@ final class ReportService
     public function fetchSoldItems(QueryOptions $options, string $traceId): array
     {
         try {
-            $response = $this->apiClient->fetchSoldItems($options->crmQuery, $traceId);
-            $data = $this->extractData($response);
-            $meta = $this->extractMeta($response);
-            $links = $this->extractLinks($response);
+            $apiResponse = $this->apiClient->fetchSoldItems($options->crmQuery, $traceId);
+            $body = $apiResponse['body'] ?? [];
+            $data = $this->extractData($body);
+            $meta = $this->extractMeta($body);
+            $links = $this->extractLinks($body);
 
-            if ($options->all) {
-                [$data, $meta, $links] = $this->collectAllSoldItemsPages($options, $traceId, $data, $meta, $links);
+            if ($options->fetchAll) {
+                [$data, $meta, $links] = $this->collectAllPages($options, $traceId, $data, $meta, $links);
             }
 
             $data = $this->applySort($data, $options->sort);
             $finalMeta = $this->buildMeta($meta, $options, count($data));
+            $finalMeta['per_page'] = $options->perPage;
+            $finalMeta['source'] = 'crm';
 
             return [
+                'status' => $apiResponse['status'] ?? 200,
                 'data' => $data,
                 'meta' => $finalMeta,
                 'crm_links' => $links,
@@ -65,30 +71,42 @@ final class ReportService
      * @param array<string, mixed> $links
      * @return array{0: array<int, mixed>, 1: array<string, mixed>, 2: array<string, mixed>}
      */
-    private function collectAllSoldItemsPages(QueryOptions $options, string $traceId, array $data, array $meta, array $links): array
+    private function collectAllPages(QueryOptions $options, string $traceId, array $data, array $meta, array $links): array
     {
         $currentLinks = $links;
         $collected = $data;
         $currentMeta = $meta;
-        $safetyCounter = 0;
+        $pagesFetched = 1;
 
         while (isset($currentLinks['next']) && is_string($currentLinks['next']) && $currentLinks['next'] !== '') {
+            if ($pagesFetched >= self::MAX_FETCH_PAGES) {
+                break;
+            }
+
             $nextQuery = $this->extractQueryFromLink($currentLinks['next']);
             if ($nextQuery === null) {
                 break;
             }
 
-            $response = $this->apiClient->fetchSoldItems($nextQuery, $traceId);
-            $nextData = $this->extractData($response);
-            $collected = array_merge($collected, $nextData);
-            $currentMeta = $this->extractMeta($response);
-            $currentLinks = $this->extractLinks($response);
-
-            if (++$safetyCounter > 50) {
+            if (!isset($nextQuery['page'])) {
                 break;
             }
+
+            $nextQuery['per_page'] = isset($nextQuery['per_page'])
+                ? (int) $nextQuery['per_page']
+                : $options->perPage;
+
+            $apiResponse = $this->apiClient->fetchSoldItems($nextQuery, $traceId);
+            $body = $apiResponse['body'] ?? [];
+            $nextData = $this->extractData($body);
+            $collected = array_merge($collected, $nextData);
+            $currentMeta = $this->extractMeta($body);
+            $currentLinks = $this->extractLinks($body);
+
+            $pagesFetched++;
         }
 
         return [$collected, $currentMeta, $currentLinks];
     }
 }
+

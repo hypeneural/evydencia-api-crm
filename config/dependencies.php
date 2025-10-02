@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
@@ -15,7 +15,6 @@ use App\Infrastructure\Persistence\PdoOrderRepository;
 use App\Settings\Settings;
 use DI\ContainerBuilder;
 use GuzzleHttp\Client as HttpClient;
-use PDO;
 use Predis\Client as PredisClient;
 use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
@@ -32,7 +31,7 @@ return static function (ContainerBuilder $containerBuilder): void {
 
             return $factory->createLogger();
         },
-        'db.connection' => static function (ContainerInterface $container): ?PDO {
+        'db.connection' => static function (ContainerInterface $container): ?\PDO {
             $database = $container->get(Settings::class)->getDatabase();
 
             if (empty($database['host']) || empty($database['database'])) {
@@ -48,13 +47,13 @@ return static function (ContainerBuilder $containerBuilder): void {
                 $database['charset'] ?? 'utf8mb4'
             );
 
-            $pdo = new PDO($dsn, $database['username'] ?? 'root', $database['password'] ?? '', $database['options'] ?? []);
+            $pdo = new \PDO($dsn, $database['username'] ?? 'root', $database['password'] ?? '', $database['options'] ?? []);
             $pdo->exec(sprintf('SET NAMES %s COLLATE %s', $database['charset'] ?? 'utf8mb4', $database['collation'] ?? 'utf8mb4_unicode_ci'));
 
             return $pdo;
         },
         PdoOrderRepository::class => static function (ContainerInterface $container): PdoOrderRepository {
-            /** @var PDO|null $pdo */
+            /** @var \PDO|null $pdo */
             $pdo = $container->get('db.connection');
 
             return new PdoOrderRepository($pdo);
@@ -136,11 +135,3 @@ return static function (ContainerBuilder $containerBuilder): void {
         },
     ]);
 };
-
-
-
-
-
-
-
-

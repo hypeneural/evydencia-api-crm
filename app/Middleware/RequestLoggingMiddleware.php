@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
@@ -42,3 +42,4 @@ final class RequestLoggingMiddleware implements MiddlewareInterface
         return $response;
     }
 }
+

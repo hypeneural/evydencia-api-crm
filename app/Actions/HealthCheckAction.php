@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
@@ -15,35 +15,33 @@ final class HealthCheckAction
         $traceId = $this->resolveTraceId($request);
 
         $payload = [
+            'success' => true,
             'data' => [
                 'status' => 'ok',
                 'timestamp' => (new DateTimeImmutable())->format(DATE_ATOM),
             ],
             'meta' => [
                 'page' => 1,
-                'size' => 1,
-                'count' => 1,
-                'total_items' => 1,
-                'total_pages' => 1,
+                'per_page' => 1,
+                'total' => 1,
+                'source' => 'api',
             ],
             'links' => [
                 'self' => (string) $request->getUri(),
-                'first' => (string) $request->getUri(),
-                'prev' => null,
                 'next' => null,
-                'last' => (string) $request->getUri(),
+                'prev' => null,
             ],
             'trace_id' => $traceId,
-            'source' => [
-                'system' => 'api',
-                'endpoint' => '/health',
-            ],
         ];
 
-        $response->getBody()->write((string) json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $body = $response->getBody();
+        if ($body->isSeekable()) {
+            $body->rewind();
+        }
+        $body->write((string) json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 
         return $response
-            ->withHeader('Content-Type', 'application/json')
+            ->withHeader('Content-Type', 'application/json; charset=utf-8')
             ->withHeader('Trace-Id', $traceId);
     }
 
@@ -58,3 +56,4 @@ final class HealthCheckAction
         return $traceId;
     }
 }
+

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
@@ -31,25 +31,50 @@ final class EvydenciaApiClient
 
     /**
      * @param array<string, mixed> $query
-     * @return array<string, mixed>
+     * @return array{status: int, body: array<string, mixed>|array<int, mixed>, raw?: string}
+     */
+    public function get(string $endpoint, array $query, string $traceId): array
+    {
+        return $this->request('GET', $endpoint, ['query' => $query], $traceId);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array{status: int, body: array<string, mixed>|array<int, mixed>, raw?: string}
+     */
+    public function post(string $endpoint, array $payload, string $traceId): array
+    {
+        return $this->request('POST', $endpoint, ['json' => $payload], $traceId);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array{status: int, body: array<string, mixed>|array<int, mixed>, raw?: string}
+     */
+    public function put(string $endpoint, array $payload, string $traceId): array
+    {
+        return $this->request('PUT', $endpoint, ['json' => $payload], $traceId);
+    }
+
+    /**
+     * @param array<string, mixed> $query
+     * @return array{status: int, body: array<string, mixed>|array<int, mixed>, raw?: string}
      */
     public function searchOrders(array $query, string $traceId): array
     {
-        return $this->request('GET', 'orders/search', [
-            'query' => $query,
-        ], $traceId);
+        return $this->get('orders/search', $query, $traceId);
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{status: int, body: array<string, mixed>|array<int, mixed>, raw?: string}
      */
     public function fetchOrderDetail(string $uuid, string $traceId): array
     {
-        return $this->request('GET', sprintf('orders/%s/detail', $uuid), [], $traceId);
+        return $this->get(sprintf('orders/%s/detail', $uuid), [], $traceId);
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{status: int, body: array<string, mixed>|array<int, mixed>, raw?: string}
      */
     public function updateOrderStatus(string $uuid, string $status, ?string $note, string $traceId): array
     {
@@ -62,36 +87,30 @@ final class EvydenciaApiClient
             $payload['note'] = $note;
         }
 
-        return $this->request('PUT', 'order/status', [
-            'json' => $payload,
-        ], $traceId);
+        return $this->put('order/status', $payload, $traceId);
     }
 
     /**
      * @param array<string, mixed> $query
-     * @return array<string, mixed>
+     * @return array{status: int, body: array<string, mixed>|array<int, mixed>, raw?: string}
      */
     public function fetchSoldItems(array $query, string $traceId): array
     {
-        return $this->request('GET', 'reports/sold-items', [
-            'query' => $query,
-        ], $traceId);
+        return $this->get('reports/sold-items', $query, $traceId);
     }
 
     /**
      * @param array<string, mixed> $query
-     * @return array<string, mixed>
+     * @return array{status: int, body: array<string, mixed>|array<int, mixed>, raw?: string}
      */
     public function fetchCampaignSchedule(array $query, string $traceId): array
     {
-        return $this->request('GET', 'campaigns/schedule/search', [
-            'query' => $query,
-        ], $traceId);
+        return $this->get('campaigns/schedule/search', $query, $traceId);
     }
 
     /**
      * @param array<string, mixed> $options
-     * @return array<string, mixed>
+     * @return array{status: int, body: array<string, mixed>|array<int, mixed>, raw?: string}
      */
     private function request(string $method, string $uri, array $options, string $traceId): array
     {
@@ -114,21 +133,10 @@ final class EvydenciaApiClient
         try {
             $response = $this->httpClient->request($method, $normalizedUri, $options);
             $statusCode = $response->getStatusCode();
-            $body = (string) $response->getBody();
-            $decoded = $body === '' ? [] : json_decode($body, true);
-
-            if ($decoded === null && $body !== '') {
-                $this->logger->error('CRM response is not valid JSON', [
-                    'trace_id' => $traceId,
-                    'method' => $method,
-                    'uri' => $normalizedUri,
-                    'status_code' => $statusCode,
-                ]);
-
-                throw new CrmRequestException($statusCode, [], 'Invalid response format returned by CRM.');
-            }
-
-            $responsePayload = is_array($decoded) ? $decoded : [];
+            $bodyString = (string) $response->getBody();
+            $decoded = $bodyString === '' ? [] : json_decode($bodyString, true);
+            $isJson = !($bodyString !== '' && $decoded === null);
+            $payload = $isJson && is_array($decoded) ? $decoded : [];
 
             if ($statusCode >= 400) {
                 $this->logger->warning('CRM responded with an error status', [
@@ -136,13 +144,27 @@ final class EvydenciaApiClient
                     'method' => $method,
                     'uri' => $normalizedUri,
                     'status_code' => $statusCode,
-                    'payload_keys' => array_keys($responsePayload),
+                    'payload_keys' => array_keys((array) $payload),
                 ]);
 
-                throw new CrmRequestException($statusCode, $responsePayload, sprintf('CRM responded with status %d.', $statusCode));
+                $errorPayload = $payload;
+                if (!$isJson && $bodyString !== '') {
+                    $errorPayload = ['raw' => $bodyString];
+                }
+
+                throw new CrmRequestException($statusCode, $errorPayload, sprintf('CRM responded with status %d.', $statusCode));
             }
 
-            return $responsePayload;
+            $result = [
+                'status' => $statusCode,
+                'body' => $payload,
+            ];
+
+            if (!$isJson && $bodyString !== '') {
+                $result['raw'] = $bodyString;
+            }
+
+            return $result;
         } catch (ConnectException $exception) {
             $this->logger->error('Unable to reach CRM', [
                 'trace_id' => $traceId,
@@ -166,19 +188,25 @@ final class EvydenciaApiClient
 
             $response = $exception->getResponse();
             $statusCode = $response->getStatusCode();
-            $body = (string) $response->getBody();
-            $decoded = $body === '' ? [] : json_decode($body, true);
-            $payload = is_array($decoded) ? $decoded : [];
+            $bodyString = (string) $response->getBody();
+            $decoded = $bodyString === '' ? [] : json_decode($bodyString, true);
+            $isJson = !($bodyString !== '' && $decoded === null);
+            $payload = $isJson && is_array($decoded) ? $decoded : [];
 
             $this->logger->warning('CRM responded with an error (RequestException)', [
                 'trace_id' => $traceId,
                 'method' => $method,
                 'uri' => $normalizedUri,
                 'status_code' => $statusCode,
-                'payload_keys' => array_keys($payload),
+                'payload_keys' => array_keys((array) $payload),
             ]);
 
-            throw new CrmRequestException($statusCode, $payload, sprintf('CRM responded with status %d.', $statusCode));
+            $errorPayload = $payload;
+            if (!$isJson && $bodyString !== '') {
+                $errorPayload = ['raw' => $bodyString];
+            }
+
+            throw new CrmRequestException($statusCode, $errorPayload, sprintf('CRM responded with status %d.', $statusCode));
         } catch (GuzzleException $exception) {
             $this->logger->error('Unexpected Guzzle error while communicating with CRM', [
                 'trace_id' => $traceId,
@@ -191,3 +219,4 @@ final class EvydenciaApiClient
         }
     }
 }
+

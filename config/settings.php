@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
@@ -56,3 +56,4 @@ return [
         'max_age' => (int) ($_ENV['CORS_MAX_AGE'] ?? 86400),
     ],
 ];
+

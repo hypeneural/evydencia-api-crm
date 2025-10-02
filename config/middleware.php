@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
@@ -11,14 +11,12 @@ use Middlewares\TrailingSlash;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Log\LoggerInterface;
-use RuntimeException;
 use Slim\App;
 use Slim\Exception\HttpException;
 use Slim\Psr7\Response;
-use Throwable;
 use Tuupola\Middleware\CorsMiddleware;
 
-return static function (App $app): void {
+return function (App $app): void {
     $container = $app->getContainer();
 
     if ($container === null) {
@@ -109,19 +107,9 @@ return static function (App $app): void {
                 429 => $responder->tooManyRequests($baseResponse, $traceId, $detail, 60),
                 502 => $responder->badGateway($baseResponse, $traceId, $detail),
                 500 => $responder->internalError($baseResponse, $traceId, $detail),
-                default => $responder->problem(
-                    $baseResponse,
-                    $statusCode,
-                    match ($statusCode) {
-                        400 => 'Bad Request',
-                        403 => 'Forbidden',
-                        404 => 'Not Found',
-                        default => 'Error',
-                    },
-                    $detail,
-                    $traceId
-                ),
+                default => $responder->error($baseResponse, $traceId, 'error', $detail, $statusCode),
             };
         }
     );
 };
+

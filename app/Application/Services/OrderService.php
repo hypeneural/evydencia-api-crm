@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
@@ -20,6 +20,8 @@ final class OrderService
 {
     use HandlesListResults;
 
+    private const MAX_FETCH_PAGES = 20;
+
     public function __construct(
         private readonly EvydenciaApiClient $apiClient,
         private readonly OrderRepositoryInterface $orderRepository,
@@ -33,12 +35,13 @@ final class OrderService
     public function searchOrders(QueryOptions $options, string $traceId): array
     {
         try {
-            $response = $this->apiClient->searchOrders($options->crmQuery, $traceId);
-            $data = $this->extractData($response);
-            $meta = $this->extractMeta($response);
-            $links = $this->extractLinks($response);
+            $apiResponse = $this->apiClient->searchOrders($options->crmQuery, $traceId);
+            $body = $apiResponse['body'] ?? [];
+            $data = $this->extractData($body);
+            $meta = $this->extractMeta($body);
+            $links = $this->extractLinks($body);
 
-            if ($options->all) {
+            if ($options->fetchAll) {
                 [$data, $meta, $links] = $this->collectAllPages($options, $traceId, $data, $meta, $links);
             }
 
@@ -47,8 +50,11 @@ final class OrderService
             $data = $this->applyProjection($data, $options->fields['orders'] ?? []);
 
             $finalMeta = $this->buildMeta($meta, $options, count($data));
+            $finalMeta['per_page'] = $options->perPage;
+            $finalMeta['source'] = 'crm';
 
             return [
+                'status' => $apiResponse['status'] ?? 200,
                 'data' => $data,
                 'meta' => $finalMeta,
                 'crm_links' => $links,
@@ -72,11 +78,12 @@ final class OrderService
     public function fetchOrderDetail(string $uuid, string $traceId): array
     {
         try {
-            $response = $this->apiClient->fetchOrderDetail($uuid, $traceId);
-            $data = $this->extractData($response);
+            $apiResponse = $this->apiClient->fetchOrderDetail($uuid, $traceId);
+            $body = $apiResponse['body'] ?? [];
+            $data = $this->extractData($body);
 
             if (!is_array($data) || $data === []) {
-                $data = $response;
+                $data = $body;
             }
 
             $local = $this->orderRepository->findByUuid($uuid);
@@ -104,8 +111,13 @@ final class OrderService
     public function updateOrderStatus(string $uuid, string $status, ?string $note, string $traceId): array
     {
         try {
-            $response = $this->apiClient->updateOrderStatus($uuid, $status, $note, $traceId);
-            $data = $this->extractData($response);
+            $apiResponse = $this->apiClient->updateOrderStatus($uuid, $status, $note, $traceId);
+            $body = $apiResponse['body'] ?? [];
+            $data = $this->extractData($body);
+
+            if (!is_array($data) || $data === []) {
+                $data = $body;
+            }
 
             $localPayload = [
                 'uuid' => $uuid,
@@ -119,7 +131,7 @@ final class OrderService
             ];
             $this->orderRepository->upsert($uuid, $localPayload);
 
-            return is_array($data) ? $data : $response;
+            return $data;
         } catch (CrmUnavailableException|CrmRequestException $exception) {
             throw $exception;
         } catch (Throwable $exception) {
@@ -170,25 +182,37 @@ final class OrderService
         $currentLinks = $links;
         $collected = $data;
         $currentMeta = $meta;
-        $safetyCounter = 0;
+        $pagesFetched = 1;
 
         while (isset($currentLinks['next']) && is_string($currentLinks['next']) && $currentLinks['next'] !== '') {
+            if ($pagesFetched >= self::MAX_FETCH_PAGES) {
+                break;
+            }
+
             $nextQuery = $this->extractQueryFromLink($currentLinks['next']);
             if ($nextQuery === null) {
                 break;
             }
 
-            $response = $this->apiClient->searchOrders($nextQuery, $traceId);
-            $nextData = $this->extractData($response);
-            $collected = array_merge($collected, $nextData);
-            $currentMeta = $this->extractMeta($response);
-            $currentLinks = $this->extractLinks($response);
-
-            if (++$safetyCounter > 50) {
+            if (!isset($nextQuery['page'])) {
                 break;
             }
+
+            $nextQuery['per_page'] = isset($nextQuery['per_page'])
+                ? (int) $nextQuery['per_page']
+                : $options->perPage;
+
+            $apiResponse = $this->apiClient->searchOrders($nextQuery, $traceId);
+            $body = $apiResponse['body'] ?? [];
+            $nextData = $this->extractData($body);
+            $collected = array_merge($collected, $nextData);
+            $currentMeta = $this->extractMeta($body);
+            $currentLinks = $this->extractLinks($body);
+
+            $pagesFetched++;
         }
 
         return [$collected, $currentMeta, $currentLinks];
     }
 }
+

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
@@ -61,7 +61,13 @@ final class UpdateOrderStatusAction
 
         $resource = is_array($result) ? $result : ['result' => $result];
 
-        return $this->responder->successResource($response, $resource, $traceId, 'order/status');
+        return $this->responder->successResource(
+            $response,
+            $resource,
+            $traceId,
+            ['source' => 'crm'],
+            ['self' => (string) $request->getUri()]
+        );
     }
 
     private function resolveTraceId(Request $request): string
@@ -108,7 +114,7 @@ final class UpdateOrderStatusAction
         if ($uuid === '') {
             $errors[] = [
                 'field' => 'uuid',
-                'message' => 'Obrigatório informar o identificador do pedido.',
+                'message' => 'Obrigatorio informar o identificador do pedido.',
             ];
         }
 
@@ -117,7 +123,7 @@ final class UpdateOrderStatusAction
         } catch (NestedValidationException $exception) {
             $errors[] = [
                 'field' => 'status',
-                'message' => $exception->getMessages()[0] ?? 'Status inválido.',
+                'message' => $exception->getMessages()[0] ?? 'Status invalido.',
             ];
         }
 
@@ -127,7 +133,7 @@ final class UpdateOrderStatusAction
             } catch (NestedValidationException $exception) {
                 $errors[] = [
                     'field' => 'note',
-                    'message' => $exception->getMessages()[0] ?? 'Observação inválida.',
+                    'message' => $exception->getMessages()[0] ?? 'Observacao invalida.',
                 ];
             }
         }
@@ -153,3 +159,4 @@ final class UpdateOrderStatusAction
         return null;
     }
 }
+

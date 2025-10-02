@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
@@ -87,3 +87,4 @@ final class Settings
         return $app['api_key'] ?? null;
     }
 }
+

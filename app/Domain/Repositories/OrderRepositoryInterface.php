@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
@@ -16,3 +16,4 @@ interface OrderRepositoryInterface
      */
     public function upsert(string $uuid, array $payload): void;
 }
+

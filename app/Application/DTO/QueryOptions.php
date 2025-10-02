@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
@@ -14,10 +14,11 @@ final class QueryOptions
     public function __construct(
         public readonly array $crmQuery,
         public readonly int $page,
-        public readonly int $size,
-        public readonly bool $all,
+        public readonly int $perPage,
+        public readonly bool $fetchAll,
         public readonly array $sort,
         public readonly array $fields
     ) {
     }
 }
+

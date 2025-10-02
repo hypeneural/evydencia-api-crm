@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
@@ -32,42 +32,45 @@ trait HandlesListAction
         $queryParams = $request->getQueryParams();
         $currentPage = (int) ($meta['page'] ?? $options->page);
 
+        if ($options->fetchAll) {
+            return [
+                'self' => (string) $uri,
+                'next' => null,
+                'prev' => null,
+            ];
+        }
+
         $links = [
             'self' => (string) $uri,
-            'first' => $this->buildPageUri($uri, $queryParams, 1, $options->all),
-            'prev' => $currentPage > 1 ? $this->buildPageUri($uri, $queryParams, $currentPage - 1, $options->all) : null,
             'next' => null,
-            'last' => null,
+            'prev' => $currentPage > 1 ? $this->buildPageUri($uri, $queryParams, $options, $currentPage - 1) : null,
         ];
-
-        if ($options->all) {
-            $links['first'] = (string) $uri;
-            return $links;
-        }
 
         $totalPages = $meta['total_pages'] ?? null;
         if (is_int($totalPages) && $totalPages > 0) {
             if ($currentPage < $totalPages) {
-                $links['next'] = $this->buildPageUri($uri, $queryParams, $currentPage + 1, $options->all);
+                $links['next'] = $this->buildPageUri($uri, $queryParams, $options, $currentPage + 1);
             }
-            $links['last'] = $this->buildPageUri($uri, $queryParams, $totalPages, $options->all);
-        } else {
-            if (isset($crmLinks['next']) && is_string($crmLinks['next']) && $crmLinks['next'] !== '') {
-                $nextQuery = $this->extractQueryFromLink($crmLinks['next']);
-                if ($nextQuery !== null && isset($nextQuery['page'])) {
-                    $nextPage = (int) $nextQuery['page'];
-                    if ($nextPage > 0) {
-                        $links['next'] = $this->buildPageUri($uri, $queryParams, $nextPage, $options->all);
-                    }
+
+            return $links;
+        }
+
+        if (isset($crmLinks['next']) && is_string($crmLinks['next']) && $crmLinks['next'] !== '') {
+            $nextQuery = $this->extractQueryFromLink($crmLinks['next']);
+            if ($nextQuery !== null && isset($nextQuery['page'])) {
+                $nextPage = (int) $nextQuery['page'];
+                if ($nextPage > 0) {
+                    $links['next'] = $this->buildPageUri($uri, $queryParams, $options, $nextPage);
                 }
             }
-            if (isset($crmLinks['last']) && is_string($crmLinks['last']) && $crmLinks['last'] !== '') {
-                $lastQuery = $this->extractQueryFromLink($crmLinks['last']);
-                if ($lastQuery !== null && isset($lastQuery['page'])) {
-                    $lastPage = (int) $lastQuery['page'];
-                    if ($lastPage > 0) {
-                        $links['last'] = $this->buildPageUri($uri, $queryParams, $lastPage, $options->all);
-                    }
+        }
+
+        if ($links['prev'] === null && isset($crmLinks['prev']) && is_string($crmLinks['prev']) && $crmLinks['prev'] !== '') {
+            $prevQuery = $this->extractQueryFromLink($crmLinks['prev']);
+            if ($prevQuery !== null && isset($prevQuery['page'])) {
+                $prevPage = (int) $prevQuery['page'];
+                if ($prevPage > 0) {
+                    $links['prev'] = $this->buildPageUri($uri, $queryParams, $options, $prevPage);
                 }
             }
         }
@@ -75,18 +78,25 @@ trait HandlesListAction
         return $links;
     }
 
-    /**
-     * @param array<string, mixed> $queryParams
-     */
-    protected function buildPageUri(UriInterface $uri, array $queryParams, int $page, bool $all): string
+    protected function buildPageUri(UriInterface $uri, array $queryParams, QueryOptions $options, int $page): string
     {
         if ($page < 1) {
             $page = 1;
         }
 
-        $queryParams['page']['number'] = $page;
-        if ($all) {
-            $queryParams['all'] = 'true';
+        unset($queryParams['page']);
+        $queryParams['page'] = $page;
+
+        $perPage = isset($queryParams['per_page']) ? (int) $queryParams['per_page'] : $options->perPage;
+        if ($perPage <= 0) {
+            $perPage = $options->perPage;
+        }
+        $queryParams['per_page'] = $perPage;
+
+        if ($options->fetchAll) {
+            $queryParams['fetch'] = 'all';
+        } else {
+            unset($queryParams['fetch'], $queryParams['all']);
         }
 
         $queryString = http_build_query($queryParams);
@@ -112,3 +122,4 @@ trait HandlesListAction
         return $query === [] ? null : $query;
     }
 }
+

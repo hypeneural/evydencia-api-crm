@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
@@ -68,8 +68,8 @@ final class GetCampaignScheduleAction
             $result['data'],
             $meta,
             $links,
-            $traceId,
-            'campaigns/schedule/search'
+            $traceId
         );
     }
 }
+
