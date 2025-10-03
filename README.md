@@ -1,342 +1,309 @@
-﻿# Evy API
+# Evy API
 
-API REST construída em Slim 4 para integrar serviços internos com o CRM Evydencia. O projeto oferece endpoints para consulta e atualização de pedidos, relatórios de itens vendidos e programação de campanhas, aplicando um envelope de resposta consistente, autenticação via API Key, rate limit e observabilidade.
+Slim 4 based REST API that proxies requests to the Evydencia CRM and exposes a consistent, observable interface with API Key protection and rate limiting. The current surface area covers health monitoring, order workflows, sold-items reporting and campaign scheduling.
 
-## Sumário
+## Table of contents
 
-- [Tecnologias](#tecnologias)
-- [Arquitetura](#arquitetura)
-- [Setup](#setup)
-  - [Requisitos](#requisitos)
-  - [Instalação](#instalação)
-  - [Configuração](#configuração)
-  - [Execução](#execução)
-- [Estrutura de Pastas](#estrutura-de-pastas)
-- [Padrões Globais](#padrões-globais)
-  - [Autenticação](#autenticação)
-  - [Envelope de Resposta](#envelope-de-resposta)
-  - [Erros (RFC 7807)](#erros-rfc-7807)
-  - [Parâmetros de Lista](#parâmetros-de-lista)
-- [Integração com o CRM Evydencia](#integração-com-o-crm-evydencia)
-- [Endpoints](#endpoints)
+- [Features](#features)
+- [Project layout](#project-layout)
+- [Getting started](#getting-started)
+  - [Requirements](#requirements)
+  - [Installation](#installation)
+  - [Configuration](#configuration)
+  - [Run locally](#run-locally)
+- [Response contract](#response-contract)
+  - [Success envelope](#success-envelope)
+  - [Error envelope](#error-envelope)
+  - [Pagination and filtering DSL](#pagination-and-filtering-dsl)
+- [CRM integration details](#crm-integration-details)
+- [HTTP endpoints](#http-endpoints)
   - [/health](#health)
   - [/v1/orders/search](#v1orderssearch)
   - [/v1/orders/{uuid}](#v1ordersuuid)
   - [/v1/orders/{uuid}/status](#v1ordersuuidstatus)
   - [/v1/reports/sold-items](#v1reportssold-items)
   - [/v1/campaigns/schedule](#v1campaignsschedule)
-- [Logs e Observabilidade](#logs-e-observabilidade)
-- [Rate Limiting](#rate-limiting)
-- [Roadmap / Próximos Passos](#roadmap--próximos-passos)
-- [Licença](#licença)
+- [Logging & observability](#logging--observability)
+- [Rate limiting](#rate-limiting)
+- [Next steps](#next-steps)
 
-## Tecnologias
+## Features
 
-- **PHP 8.3**
-- **Slim Framework 4** para roteamento e middlewares
-- **PHP-DI** como container de dependências
-- **Guzzle 7** para comunicação HTTP com o CRM Evydencia
-- **Predis** para cache/controle de rate limit em Redis
-- **Monolog 2** para logging estruturado
-- **vlucas/phpdotenv** para gerenciamento de variáveis de ambiente
-- **Respect/Validation** para validação de payloads
+- Slim 4 + PHP-DI bootstrap with explicit container configuration.
+- Uniform response envelope (`success`, `data`, `meta`, `links`, `trace_id`).
+- API Key authentication (header `X-API-Key`) for every `/v1/**` route.
+- Consistent pagination, sorting and filtering DSL (aliases translated to CRM query params).
+- Guzzle HTTP client wrapper (`EvydenciaApiClient`) with 30s timeout, automatic header injection and structured error handling.
+- Request logging middleware (method, path, status, duration, trace_id) with Monolog.
+- Redis-backed rate limiting middleware (per IP + route).
 
-## Arquitetura
+## Project layout
 
-A solução segue um design modular e orientado a domínio:
+```
+app/
+  Actions/                # HTTP handlers grouped by domain (Orders, Reports, Campaigns, Health)
+  Application/            # DTOs, services (order/report/campaign) and QueryMapper support
+  Domain/                 # Exceptions and repository contracts (orders_map is optional, future work)
+  Infrastructure/         # HTTP client, logging factory, rate limiter, persistence adapters, etc.
+  Middleware/             # API key, rate limiting and request logging middlewares
+  Settings/               # Typed access to configuration arrays
+config/
+  settings.php            # Reads .env and builds the settings array
+  dependencies.php        # PHP-DI bindings
+  middleware.php          # Registers global middlewares and error handler
+  routes.php              # Route definitions
+public/
+  index.php               # Front controller
+var/logs/                 # Runtime logs (gitignored)
+README.md                 # This file
+```
 
-- `app/Actions`: controladores HTTP enxutos, focados em orquestração e respostas.
-- `app/Application`: serviços de aplicação, DTOs, mapeadores da DSL pública para o CRM.
-- `app/Domain`: contratos e exceções específicas.
-- `app/Infrastructure`: integrações (HTTP, logging, cache, persistência, migrations).
-- `app/Middleware`: segurança, rate limit e observabilidade.
-- `config/`: bootstrapping (settings, dependências, middlewares, rotas).
+## Getting started
 
-## Setup
-
-### Requisitos
+### Requirements
 
 - PHP 8.3+
 - Composer 2.8+
-- Redis (para rate limit) — opcional, mas recomendado
-- MySQL 8.4+ (para persistência opcional de `orders_map`)
+- Redis (optional, required only if you want rate limiting)
+- MySQL (optional; currently only used for the optional `orders_map` repository)
 
-### Instalação
+### Installation
 
 ```bash
 composer install
 ```
 
-### Configuração
+### Configuration
 
-1. Copie o arquivo `.env.example` para `.env`.
-2. Ajuste as variáveis principais:
-   - `APP_API_KEY`: chave privada exigida pelo header `X-API-Key`.
-   - `CRM_BASE_URL`: normalmente `https://evydencia.com/api`.
-   - `CRM_TOKEN`: token fornecido pelo Evydencia (use valor direto, sem `Bearer`).
-   - Variáveis de Redis (`REDIS_*`) se usar rate limiting distribuído.
-   - Parâmetros de banco (`DB_*`) caso use a persistência local opcional.
+1. Copy `.env.example` to `.env`.
+2. Set the mandatory values:
+   - `APP_API_KEY`: API key that clients must send in `X-API-Key`.
+   - `CRM_BASE_URL`: defaults to `https://evydencia.com/api`.
+   - `CRM_TOKEN`: Evydencia access token (plain value, no `Bearer`).
+3. Optional adjustments:
+   - `LOG_*` to control Monolog channel, path and level.
+   - `REDIS_*` if rate limiting should use an external Redis.
+   - `DB_*` if you plan to persist data locally (future endpoints).
 
-### Execução
+### Run locally
 
-#### Servidor embutido
+There are two common options:
 
 ```bash
+# PHP built-in server (default port 8080)
 composer start
+
+# or explicitly
+php -S 127.0.0.1:8080 -t public
 ```
 
-O servidor roda por padrão em `http://localhost:8080`.
+With Laragon/Apache, point the virtual host root to `public/` and ensure URL rewriting is enabled (`public/.htaccess`).
 
-#### Apache/Laragon
+## Response contract
 
-- Aponte o DocumentRoot para `public/`.
-- Certifique-se de que o rewrite esteja habilitado para o `.htaccess` existente.
-
-## Estrutura de Pastas
-
-```
-├── app/
-│   ├── Actions/              # HTTP actions organizadas por contexto (Orders, Reports, Campaigns)
-│   ├── Application/          # Serviços, DTOs, mapeadores e suportes auxiliares
-│   ├── Domain/               # Exceções e contratos de domínio
-│   ├── Infrastructure/       # Integrações (HTTP, logging, cache, persistence)
-│   ├── Middleware/           # Middlewares de segurança, rate limit, logging
-│   └── Settings/             # Aggregator de configurações
-├── config/                   # settings.php, dependencies.php, middleware.php, routes.php
-├── public/                   # front controller (index.php) e .htaccess
-├── database/                 # espaço para assets SQL
-├── var/logs/                 # diretório de logs (ignorado no git)
-├── tests/                    # pasta reservada para testes
-├── vendor/                   # dependências do Composer
-├── .env.example              # modelo de variáveis de ambiente
-└── composer.json             # manifesto do projeto
-```
-
-## Padrões Globais
-
-### Autenticação
-
-- Header obrigatório: `X-API-Key`.
-- Valor definido em `APP_API_KEY` no `.env`.
-- Endpoints `/v1/*` retornam `401 Unauthorized` com payload RFC 7807 se a chave estiver ausente/inválida.
-
-### Envelope de Resposta
-
-Todas as respostas seguem o mesmo formato:
+### Success envelope
 
 ```json
 {
+  "success": true,
   "data": [],
   "meta": {
     "page": 1,
-    "size": 50,
+    "per_page": 50,
+    "total": null,
     "count": 0,
-    "total_items": null,
     "total_pages": null,
-    "elapsed_ms": 0
+    "source": "crm",
+    "elapsed_ms": 5
   },
   "links": {
-    "self": "",
-    "first": "",
-    "prev": null,
-    "next": null,
-    "last": null
+    "self": "http://localhost:8080/v1/orders/search?page=1",
+    "next": "http://localhost:8080/v1/orders/search?page=2",
+    "prev": null
   },
-  "trace_id": "f0e1d2c3b4a59687",
-  "source": {
-    "system": "crm",
-    "endpoint": "orders/search"
-  }
+  "trace_id": "f0e1d2c3b4a59687"
 }
 ```
 
-- `trace_id` é sempre um hex de 16 chars (`bin2hex(random_bytes(8))`).
-- `source.endpoint` corresponde ao endpoint do CRM chamado.
-- Respostas de recurso único (ex.: `/v1/orders/{uuid}`) podem omitir `meta/links`.
+- `meta.source` indicates the upstream (`crm` for Evydencia, `api` for local data).
+- `meta.count` is the number of items returned in `data`.
+- `links` follow the pagination DSL; `next`/`prev` are omitted when unavailable.
 
-### Erros (RFC 7807)
+### Error envelope
 
-Erros sempre retornam `Content-Type: application/problem+json` e seguem a RFC 7807. Exemplos:
-
-- **422 Validation**
-
-  ```json
-  {
-    "type": "https://api.local/errors/validation",
-    "title": "Parâmetros inválidos",
-    "status": 422,
-    "detail": "Alguns parâmetros estão inválidos ou ausentes.",
+```json
+{
+  "success": false,
+  "error": {
+    "code": "unprocessable_entity",
+    "message": "Parametros invalidos",
     "errors": [
-      { "field": "page[size]", "message": "máximo 200" }
-    ],
-    "trace_id": "..."
-  }
-  ```
+      { "field": "page", "message": "deve ser maior ou igual a 1" }
+    ]
+  },
+  "trace_id": "d18ed62ebc6345b5"
+}
+```
 
-- **401 Unauthorized** (API Key ausente/errada)
+Error codes used today: `unauthorized`, `too_many_requests`, `bad_gateway`, `internal_error`, `not_found`, `conflict`, `unprocessable_entity`.
 
-  ```json
-  {
-    "type": "https://api.local/errors/unauthorized",
-    "title": "Unauthorized",
-    "status": 401,
-    "detail": "Invalid API key.",
-    "trace_id": "..."
-  }
-  ```
+### Pagination and filtering DSL
 
-- **429 Too Many Requests** (rate limit excedido)
+| Concept            | Query parameters                                                                | Notes                                                                                                     |
+|--------------------|----------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------|
+| Pagination         | `page`, `per_page` (defaults: 1 / 50, max per_page = 200)                        | `page[number]` / `page[size]` aliases also accepted.                                                      |
+| Sorting            | `sort=field,-other`                                                              | `-` indicates descending. Order service converts to `field:asc|desc` for the CRM.                         |
+| Basic filters      | `filter[field]=value`                                                            | Mapped via `QueryMapper`; aliases listed below.                                                           |
+| `IN` filters       | `filter[field][in]=a,b,c`                                                        | Converted to comma-separated string.                                                                      |
+| Range filters      | `filter[field][gte|lte]=YYYY-MM-DD` (or `YYYY-MM-DD HH:MM:SS` when applicable)    | Mapped to `order[created-start]`, `order[created-end]`, etc.                                              |
+| Like filters       | `filter[field][like]=text`                                                       | Wrapped with `%text%` before sending to the CRM.                                                          |
+| Projection         | `fields[orders]=uuid,status,customer.name`                                      | Optional; applies to the in-memory result (after CRM response).                                          |
+| Fetch all pages    | `fetch=all` (alias `all=true`)                                                   | Iterates `links.next` until exhaustion or 20 pages (safety cap).                                          |
+| Pass-through raw   | `order[status]=...`, `product[slug]=...`                                        | Already in the CRM format; forwarded untouched.                                                           |
 
-  Inclui header `Retry-After`.
+**Alias mapping (Orders):**
 
-- **502 Bad Gateway** (timeout/erro do CRM)
+```
+status            -> order[status]
+created_start     -> order[created-start]
+created_end       -> order[created-end]
+session_start     -> order[session-start]
+session_end       -> order[session-end]
+selection_start   -> order[selection-start]
+selection_end     -> order[selection-end]
+customer_uuid     -> customer[uuid]
+customer_email    -> customer[email]
+customer_whatsapp -> customer[whatsapp]
+customer_name     -> customer[name]
+product_uuid      -> product[uuid]
+product_name      -> product[name]
+product_slug      -> product[slug]
+product_ref       -> product[reference]
+```
 
-  ```json
-  {
-    "type": "about:blank",
-    "title": "Bad Gateway",
-    "status": 502,
-    "detail": "CRM timeout",
-    "trace_id": "..."
-  }
-  ```
+Sold items and campaign endpoints use similar aliases:
 
-### Parâmetros de Lista
+```
+Sold items aliases:
+  item_name -> item[name]
+  item_slug -> item[slug]
+  item_ref  -> item[ref]
+  created_at[gte|lte] -> order[created-start|end]
 
-Todos os endpoints de lista aceitam a DSL pública abaixo:
+Campaign schedule aliases:
+  campaign_id   -> campaign[id]
+  contact_phone -> contacts[phone]
+```
 
-- **Paginação**
-  - `page[number]` (default 1)
-  - `page[size]` (default 50, máx. 200)
-- **Ordenação**
-  - `sort=campo,-outro` (`-` indica ordem desc)
-- **Filtros**
-  - Igualdade: `filter[status]=payment_confirmed`
-  - Intervalo: `filter[created_at][gte]=YYYY-MM-DD`, `filter[created_at][lte]=YYYY-MM-DD`
-  - Like: `filter[customer_name][like]=ana`
-  - Lista: `filter[status][in]=a,b,c`
-- **Projeção**
-  - `fields[orders]=uuid,status,customer.name`
-- **Agregação**
-  - `all=true` percorre todas as páginas do CRM via `links.next` e consolida o resultado (use com cautela).
+## CRM integration details
 
-## Integração com o CRM Evydencia
+- Base URI: `CRM_BASE_URL` (default `https://evydencia.com/api`).
+- Headers sent on every call: `Accept: application/json`, `Authorization: {CRM_TOKEN}`, `Trace-Id`.
+- Guzzle client: 30s timeout, `http_errors=false`.
+- Wrapper methods: `get`, `post`, `put`, plus convenience helpers (`searchOrders`, `fetchOrderDetail`, etc.).
+- Error handling:
+  - Network/timeout -> throws `CrmUnavailableException` (mapped to 502 Bad Gateway).
+  - HTTP >= 400 -> throws `CrmRequestException` (logged with status + keys present in body).
+  - Non-JSON body is attached to the `raw` key.
 
-- Base URL (default): `https://evydencia.com/api`
-- Header obrigatório nas requisições ao CRM:
-  - `Accept: application/json`
-  - `Authorization: {CRM_TOKEN}` (sem `Bearer`)
-- Cliente Guzzle configurado com `timeout=30` e `http_errors=false`.
-- Endpoints consumidos:
-  - `GET /orders/search`
-  - `GET /orders/{uuid}/detail`
-  - `PUT /order/status`
-  - `GET /reports/sold-items`
-  - `GET /campaigns/schedule/search`
-- Timeout ou falha de rede → 502 para o cliente, logando sem expor o token.
-
-## Endpoints
+## HTTP endpoints
 
 ### /health
 
-- **Método:** `GET`
-- **Descrição:** Checagem simples de saúde.
-- **Headers:** `X-API-Key` opcional (não exigido).
-- **Resposta:** Envelope com `status: ok` e timestamp atual.
+| Method | Description              | Auth | Query/body | Response source |
+|--------|--------------------------|------|------------|-----------------|
+| GET    | Liveness/health check.   | No   | N/A        | `meta.source=api`
+
+**Response example**
+
+```json
+{
+  "success": true,
+  "data": {
+    "status": "ok",
+    "timestamp": "2025-10-02T17:10:21+00:00"
+  },
+  "meta": {
+    "page": 1,
+    "per_page": 1,
+    "total": 1,
+    "source": "api"
+  },
+  "links": {
+    "self": "http://localhost:8080/health",
+    "next": null,
+    "prev": null
+  },
+  "trace_id": "1ae52f64d8d14c88"
+}
+```
 
 ### /v1/orders/search
 
-- **Método:** `GET`
-- **Descrição:** Busca pedidos no CRM com os filtros públicos.
-- **Headers:** `X-API-Key`
-- **Query params:** DSL pública (paginadores, filtros, sort, fields, all).
-- **Mapeamento principal:**
-  - `filter[uuid] → order[uuid]`
-  - `filter[status] → order[status]`
-  - `filter[created_at][gte] → order[created-start]`
-  - `filter[customer_name][like] → customer[name]=%valor%`
-  - `filter[status][in] → order[status]=a,b,c`
-  - `page[number] → page`
-  - `page[size] → per_page`
-- **Resposta:** Envelope padrão com `meta.elapsed_ms` e links calculados. Se `all=true`, todo o conjunto é retornado com `total_pages=1`.
-- **Exemplo:**
+| Method | Description                              | Auth | Notes |
+|--------|------------------------------------------|------|-------|
+| GET    | CRM proxy that searches for orders.      | Yes  | Supports full pagination/filter DSL, projection, `fetch=all`.
 
-  ```bash
-  curl "http://localhost:8080/v1/orders/search?filter[status]=payment_confirmed&filter[created_at][gte]=2025-09-01&sort=-created_at&page[number]=1&page[size]=50" \
-    -H "X-API-Key: SUA_CHAVE"
-  ```
+**Key query parameters**
+
+- `page`, `per_page`, `sort`, `fields[orders]`
+- `filter` aliases listed earlier (`status`, `created_start`, etc.)
+- Raw pass-through (`order[status]=...`)
+- `fetch=all` to iterate up to 20 pages (aggregated locally)
+
+**Example**
+
+```bash
+curl "http://localhost:8080/v1/orders/search?status=payment_confirmed&product_slug=natal&page=1&per_page=50" \
+  -H "X-API-Key: <APP_API_KEY>"
+```
 
 ### /v1/orders/{uuid}
 
-- **Método:** `GET`
-- **Descrição:** Detalhe de um pedido específico.
-- **Headers:** `X-API-Key`
-- **Resposta:**
-  - `data` com o payload do CRM (merge com `local_map` se existir registro local).
-  - `source.endpoint = orders/{uuid}/detail`.
+| Method | Description                              | Auth | Body |
+|--------|------------------------------------------|------|------|
+| GET    | Fetches order detail (`/orders/{uuid}/detail`). | Yes | None |
+
+Adds `local_map` if the optional local repository returns data. Returns `source=crm`.
 
 ### /v1/orders/{uuid}/status
 
-- **Método:** `PUT`
-- **Headers:** `X-API-Key`, `Content-Type: application/json`
-- **Body:**
+| Method | Description                                    | Auth | Body |
+|--------|------------------------------------------------|------|------|
+| PUT    | Updates order status via `PUT /order/status`.   | Yes  | `{ "status": "...", "note": "optional" }`
 
-  ```json
-  {
-    "status": "waiting_product_retrieve",
-    "note": "opcional"
-  }
-  ```
-
-- **Validações:** `uuid` obrigatório, `status` string 2-64 chars, `note` opcional.
-- **Processo:** Encaminha `PUT /order/status` com `{"uuid":"...","status":"...","note":"..."}`; persiste em `orders_map` quando configurado.
-- **Resposta:** Payload do CRM no envelope de recurso único.
+- `status`: required string 2..64 characters.
+- `note`: optional string up to 255 characters.
+- Sanitises inputs and persists the payload to the optional `orders_map` table if configured.
 
 ### /v1/reports/sold-items
 
-- **Método:** `GET`
-- **Descrição:** Consulta relatório de itens vendidos.
-- **Headers:** `X-API-Key`
-- **Query params:**
-  - `filter[item_name] → item[name]`
-  - `filter[item_slug] → item[slug]`
-  - `filter[item_ref] → item[ref]`
-  - `filter[created_at][gte|lte] → order[created-start|end]`
-  - `page[number|size]`, `sort`, `all`
-- **Resposta:** Envelope de lista conforme padrão.
+| Method | Description                                 | Auth | Notes |
+|--------|---------------------------------------------|------|-------|
+| GET    | CRM report of sold items.                   | Yes  | Supports aliases `item_name`, `item_slug`, `item_ref`, `created_at[gte|lte]`, plus `fetch=all`.
 
 ### /v1/campaigns/schedule
 
-- **Método:** `GET`
-- **Descrição:** Lista programação de campanhas através do CRM.
-- **Headers:** `X-API-Key`
-- **Query params:**
-  - `filter[campaign_id] → campaign[id]`
-  - `filter[contact_phone] → contacts[phone]`
-  - `page[number|size]`, `sort`, `all`
-- **Resposta:** Envelope de lista com metadados e links.
+| Method | Description                               | Auth | Notes |
+|--------|-------------------------------------------|------|-------|
+| GET    | CRM campaign scheduling information.      | Yes  | Filters: `campaign_id`, `contact_phone`, pagination DSL, `fetch=all`.
 
-## Logs e Observabilidade
+## Logging & observability
 
-- Middleware `RequestLoggingMiddleware` registra cada requisição (método, rota, status, tempo em ms, `trace_id`).
-- `Trace-Id` é retornado ao cliente para correlação.
-- Erros críticos são logados com contexto minimalista (sem PII ou tokens).
-- Caminho do log configurável via `LOG_PATH` (padrão: `var/logs/app.log`).
+- `RequestLoggingMiddleware` logs one line per request (`method`, `path`, `status`, `duration_ms`, `trace_id`).
+- Every response includes the same `Trace-Id` header/value for correlation.
+- Errors are converted to the JSON problem response and recorded via Monolog.
 
-## Rate Limiting
+## Rate limiting
 
-- Middleware `RateLimitMiddleware` usa Redis (Predis) para impor limite por IP/rota.
-- Configuração via `.env` (`RATE_LIMIT_PER_MINUTE`, `REDIS_*`).
-- Sem Redis habilitado (`REDIS_HOST` vazio), o rate limiting é automaticamente ignorado.
+- Controlled by `RATE_LIMIT_PER_MINUTE` (default 60 req/min) and `rate_limit.window` (default 60s).
+- Keys on `rate_limit:{IP_HASH}:{ENDPOINT_HASH}` in Redis.
+- When the limit is reached, returns `429 Too Many Requests` with headers `Retry-After`, `X-RateLimit-*`.
+- If Redis is not configured, the middleware short-circuits, effectively disabling the limit.
 
-## Roadmap / Próximos Passos
+## Next steps
 
-- Adicionar testes automatizados (PHPUnit/Pest) para QueryMapper, serviços e middlewares.
-- Implementar caching de algumas consultas mediante parâmetros (`ETag`/`Last-Modified`).
-- Suporte a paginação “offset/limit” caso o CRM exponha.
-- CLI de migração para manter `orders_map` sincronizada.
-- Docker Compose para desenvolvimento homogêneo (PHP + Redis + MySQL).
-
-## Licença
-
-Projeto proprietário. Ajuste conforme necessidade antes de publicação.
+- Implement local MySQL-backed resources (blacklist, scheduled posts) using the existing repository contracts.
+- Add automated tests for QueryMapper edge cases, services and middleware behaviour.
+- Provide Docker Compose for PHP + Redis + MySQL to ease onboarding.
+- Extend logging with structured context (correlation IDs, upstream timings).
