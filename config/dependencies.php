@@ -2,16 +2,23 @@
 
 declare(strict_types=1);
 
+use App\Application\Services\BlacklistService;
 use App\Application\Services\CampaignService;
 use App\Application\Services\OrderService;
 use App\Application\Services\ReportService;
+use App\Application\Services\ScheduledPostService;
 use App\Application\Support\ApiResponder;
 use App\Application\Support\QueryMapper;
+use App\Domain\Repositories\BlacklistRepositoryInterface;
 use App\Domain\Repositories\OrderRepositoryInterface;
+use App\Domain\Repositories\ScheduledPostRepositoryInterface;
 use App\Infrastructure\Cache\RedisRateLimiter;
+use App\Infrastructure\Cache\ScheduledPostCache;
 use App\Infrastructure\Http\EvydenciaApiClient;
 use App\Infrastructure\Logging\LoggerFactory;
+use App\Infrastructure\Persistence\PdoBlacklistRepository;
 use App\Infrastructure\Persistence\PdoOrderRepository;
+use App\Infrastructure\Persistence\PdoScheduledPostRepository;
 use App\Settings\Settings;
 use DI\ContainerBuilder;
 use GuzzleHttp\Client as HttpClient;
@@ -59,6 +66,20 @@ return static function (ContainerBuilder $containerBuilder): void {
             return new PdoOrderRepository($pdo);
         },
         OrderRepositoryInterface::class => get(PdoOrderRepository::class),
+        PdoBlacklistRepository::class => static function (ContainerInterface $container): PdoBlacklistRepository {
+            /** @var \PDO|null $pdo */
+            $pdo = $container->get('db.connection');
+
+            return new PdoBlacklistRepository($pdo);
+        },
+        BlacklistRepositoryInterface::class => get(PdoBlacklistRepository::class),
+        PdoScheduledPostRepository::class => static function (ContainerInterface $container): PdoScheduledPostRepository {
+            /** @var \PDO|null $pdo */
+            $pdo = $container->get('db.connection');
+
+            return new PdoScheduledPostRepository($pdo);
+        },
+        ScheduledPostRepositoryInterface::class => get(PdoScheduledPostRepository::class),
         'redis.client' => static function (ContainerInterface $container): ?PredisClient {
             $redis = $container->get(Settings::class)->getRedis();
 
@@ -89,6 +110,12 @@ return static function (ContainerBuilder $containerBuilder): void {
 
             return new RedisRateLimiter($client, $container->get(Settings::class));
         },
+        ScheduledPostCache::class => static function (ContainerInterface $container): ScheduledPostCache {
+            /** @var PredisClient|null $client */
+            $client = $container->get('redis.client');
+
+            return new ScheduledPostCache($client);
+        },
         HttpClient::class => static function (ContainerInterface $container): HttpClient {
             $crm = $container->get(Settings::class)->getCrm();
             $baseUrl = $crm['base_url'] ?? 'https://evydencia.com/api';
@@ -111,6 +138,20 @@ return static function (ContainerBuilder $containerBuilder): void {
             return new EvydenciaApiClient(
                 $container->get(HttpClient::class),
                 $container->get(Settings::class),
+                $container->get(LoggerInterface::class)
+            );
+        },
+        BlacklistService::class => static function (ContainerInterface $container): BlacklistService {
+            return new BlacklistService(
+                $container->get(BlacklistRepositoryInterface::class),
+                $container->get(LoggerInterface::class),
+                $container->get('redis.client')
+            );
+        },
+        ScheduledPostService::class => static function (ContainerInterface $container): ScheduledPostService {
+            return new ScheduledPostService(
+                $container->get(ScheduledPostRepositoryInterface::class),
+                $container->get(ScheduledPostCache::class),
                 $container->get(LoggerInterface::class)
             );
         },

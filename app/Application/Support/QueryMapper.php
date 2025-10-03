@@ -109,6 +109,48 @@ final class QueryMapper
     /**
      * @var array<string, string>
      */
+    /**
+     * @var array<string, string>
+     */
+    private const BLACKLIST_EQUAL_FILTERS = [
+        'whatsapp' => 'whatsapp',
+        'has_closed_order' => 'has_closed_order',
+    ];
+
+    /**
+     * @var array<string, string>
+     */
+    private const BLACKLIST_LIKE_FILTERS = [
+        'name' => 'name_like',
+    ];
+
+    /**
+     * @var array<string, array<string, string>>
+     */
+    private const BLACKLIST_RANGE_FILTERS = [
+        'created_at' => [
+            'gte' => 'created_at_gte',
+            'lte' => 'created_at_lte',
+        ],
+    ];
+
+    /**
+     * @var array<string, string>
+     */
+    private const SCHEDULED_POSTS_EQUAL_FILTERS = [
+        'type' => 'type',
+    ];
+
+    /**
+     * @var array<string, array<string, string>>
+     */
+    private const SCHEDULED_POSTS_RANGE_FILTERS = [
+        'scheduled_datetime' => [
+            'gte' => 'scheduled_datetime_gte',
+            'lte' => 'scheduled_datetime_lte',
+        ],
+    ];
+
     private const CAMPAIGN_FILTERS = [
         'campaign_id' => 'campaign[id]',
         'contact_phone' => 'contacts[phone]',
@@ -158,6 +200,12 @@ final class QueryMapper
 
         $filters = $this->normalizeArray($queryParams['filter'] ?? []);
         $crmQuery += $this->mapSoldItemsFilters($filters);
+
+        $inlineFilters = $this->extractSoldItemsInlineFilters($queryParams);
+        if ($inlineFilters !== []) {
+            $crmQuery += $this->mapSoldItemsFilters($inlineFilters);
+        }
+
         $crmQuery += $this->mapTopLevelEquality($queryParams, self::SOLD_ITEMS_EQUAL_FILTERS);
         $crmQuery += $this->mapPassThrough($filters);
         $crmQuery += $this->mapPassThrough($queryParams);
@@ -171,6 +219,84 @@ final class QueryMapper
         }
 
         return new QueryOptions($crmQuery, $page, $perPage, $fetchAll, $sort, []);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function extractSoldItemsInlineFilters(array $params): array
+    {
+        $inline = [];
+
+        foreach (array_keys(self::SOLD_ITEMS_EQUAL_FILTERS) as $key) {
+            if (array_key_exists($key, $params)) {
+                $inline[$key] = $params[$key];
+            }
+        }
+
+        foreach (array_keys(self::SOLD_ITEMS_RANGE_FILTERS) as $key) {
+            if (array_key_exists($key, $params)) {
+                $inline[$key] = $params[$key];
+            }
+        }
+
+        return $inline;
+    }
+
+    public function mapBlacklist(array $queryParams): QueryOptions
+    {
+        [$page, $perPage] = $this->resolvePagination($queryParams);
+        $fetchAll = $this->normalizeFetch($queryParams['fetch'] ?? ($queryParams['all'] ?? null));
+
+        $filters = $this->normalizeArray($queryParams['filter'] ?? []);
+        $mappedFilters = $this->mapBlacklistFilters($filters);
+
+        $inlineFilters = $this->extractBlacklistInlineFilters($queryParams);
+        if ($inlineFilters !== []) {
+            $mappedFilters = array_merge($mappedFilters, $this->mapBlacklistFilters($inlineFilters));
+        }
+
+        $crmQuery = [
+            'filters' => $mappedFilters,
+        ];
+
+        $search = $this->sanitizeScalar($queryParams['q'] ?? null);
+        if ($search !== '') {
+            $crmQuery['search'] = $search;
+        }
+
+        $sort = $this->parseSort($queryParams['sort'] ?? null);
+        $fields = $this->parseFields($queryParams['fields'] ?? []);
+
+        return new QueryOptions($crmQuery, $page, $perPage, $fetchAll, $sort, $fields);
+    }
+
+    public function mapScheduledPosts(array $queryParams): QueryOptions
+    {
+        [$page, $perPage] = $this->resolvePagination($queryParams);
+        $fetchAll = $this->normalizeFetch($queryParams['fetch'] ?? ($queryParams['all'] ?? null));
+
+        $filters = $this->normalizeArray($queryParams['filter'] ?? []);
+        $mappedFilters = $this->mapScheduledPostsFilters($filters);
+
+        $inlineFilters = $this->extractScheduledPostsInlineFilters($queryParams);
+        if ($inlineFilters !== []) {
+            $mappedFilters = array_merge($mappedFilters, $this->mapScheduledPostsFilters($inlineFilters));
+        }
+
+        $crmQuery = [
+            'filters' => $mappedFilters,
+        ];
+
+        $search = $this->sanitizeScalar($queryParams['q'] ?? null);
+        if ($search !== '') {
+            $crmQuery['search'] = $search;
+        }
+
+        $sort = $this->parseSort($queryParams['sort'] ?? null);
+        $fields = $this->parseFields($queryParams['fields'] ?? []);
+
+        return new QueryOptions($crmQuery, $page, $perPage, $fetchAll, $sort, $fields);
     }
 
     public function mapCampaignSchedule(array $queryParams): QueryOptions
@@ -325,6 +451,268 @@ final class QueryMapper
         }
 
         return $mapped;
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<string, mixed>
+     */
+    private function mapScheduledPostsFilters(array $filters): array
+    {
+        $mapped = [];
+
+        if (isset($filters['type'])) {
+            $type = strtolower($this->sanitizeScalar($filters['type']));
+            if ($type !== '') {
+                $mapped['type'] = $type;
+            }
+        }
+
+        foreach (self::SCHEDULED_POSTS_RANGE_FILTERS as $source => $operators) {
+            if (isset($filters[$source]) && is_array($filters[$source])) {
+                foreach ($operators as $operator => $target) {
+                    $value = $this->sanitizeScalar($filters[$source][$operator] ?? null);
+                    if ($value !== '') {
+                        $mapped[$target] = $value;
+                    }
+                }
+            }
+
+            foreach ($operators as $operator => $target) {
+                $direct = $source . '_' . $operator;
+                if (isset($filters[$direct])) {
+                    $value = $this->sanitizeScalar($filters[$direct]);
+                    if ($value !== '') {
+                        $mapped[$target] = $value;
+                    }
+                }
+            }
+        }
+
+        if (isset($filters['messageId'])) {
+            $state = $this->normalizeMessageIdState($filters['messageId']);
+            if ($state !== null) {
+                $mapped['message_id_state'] = $state;
+            }
+        }
+
+        if (isset($filters['message_id_state'])) {
+            $state = $this->normalizeMessageIdState($filters['message_id_state']);
+            if ($state !== null) {
+                $mapped['message_id_state'] = $state;
+            }
+        }
+
+        return $mapped;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function extractScheduledPostsInlineFilters(array $params): array
+    {
+        $inline = [];
+
+        if (array_key_exists('type', $params) && !is_array($params['type'])) {
+            $inline['type'] = $params['type'];
+        }
+
+        if (isset($params['scheduled_datetime']) && is_array($params['scheduled_datetime'])) {
+            $inline['scheduled_datetime'] = $params['scheduled_datetime'];
+        }
+
+        foreach (['scheduled_datetime_gte' => 'gte', 'scheduled_datetime_lte' => 'lte'] as $key => $operator) {
+            if (array_key_exists($key, $params)) {
+                if (!isset($inline['scheduled_datetime'])) {
+                    $inline['scheduled_datetime'] = [];
+                }
+                $inline['scheduled_datetime'][$operator] = $params[$key];
+            }
+        }
+
+        if (array_key_exists('messageId', $params) && !is_array($params['messageId'])) {
+            $inline['messageId'] = $params['messageId'];
+        }
+
+        if (array_key_exists('message_id_state', $params) && !is_array($params['message_id_state'])) {
+            $inline['message_id_state'] = $params['message_id_state'];
+        }
+
+        return $inline;
+    }
+
+    private function normalizeMessageIdState(mixed $value): ?string
+    {
+        if (!is_scalar($value)) {
+            return null;
+        }
+
+        $normalized = strtolower(trim((string) $value));
+
+        return match ($normalized) {
+            'null', 'none', '' => 'null',
+            '!null', 'not_null' => 'not_null',
+            default => null,
+        };
+    }
+
+    private function mapBlacklistFilters(array $filters): array
+    {
+        $mapped = [];
+
+        if (array_key_exists('whatsapp', $filters)) {
+            $whatsapp = $filters['whatsapp'];
+            if (is_array($whatsapp)) {
+                $candidate = $whatsapp['eq'] ?? null;
+            } else {
+                $candidate = $whatsapp;
+            }
+
+            $normalized = $this->sanitizeWhatsapp($candidate);
+            if ($normalized !== '') {
+                $mapped['whatsapp'] = $normalized;
+            }
+        }
+
+        if (array_key_exists('name', $filters)) {
+            $nameValue = $filters['name'];
+            if (is_array($nameValue)) {
+                $candidate = $nameValue['like'] ?? ($nameValue['eq'] ?? null);
+            } else {
+                $candidate = $nameValue;
+            }
+
+            $normalized = $this->sanitizeScalar($candidate);
+            if ($normalized !== '') {
+                $mapped['name_like'] = $normalized;
+            }
+        }
+
+        if (array_key_exists('name_like', $filters)) {
+            $normalized = $this->sanitizeScalar($filters['name_like']);
+            if ($normalized !== '') {
+                $mapped['name_like'] = $normalized;
+            }
+        }
+
+        if (array_key_exists('has_closed_order', $filters)) {
+            $value = $filters['has_closed_order'];
+            if (is_array($value)) {
+                $candidate = $value['eq'] ?? null;
+            } else {
+                $candidate = $value;
+            }
+
+            $boolean = $this->normalizeBoolean($candidate);
+            if ($boolean !== null) {
+                $mapped['has_closed_order'] = $boolean;
+            }
+        }
+
+        foreach (self::BLACKLIST_RANGE_FILTERS as $source => $operators) {
+            if (isset($filters[$source]) && is_array($filters[$source])) {
+                foreach ($operators as $operator => $target) {
+                    if (!isset($filters[$source][$operator])) {
+                        continue;
+                    }
+
+                    $normalized = $this->sanitizeScalar($filters[$source][$operator]);
+                    if ($normalized !== '') {
+                        $mapped[$target] = $normalized;
+                    }
+                }
+            }
+
+            foreach ($operators as $operator => $target) {
+                $directKey = $source . '_' . $operator;
+                if (!array_key_exists($directKey, $filters)) {
+                    continue;
+                }
+
+                $normalized = $this->sanitizeScalar($filters[$directKey]);
+                if ($normalized !== '') {
+                    $mapped[$target] = $normalized;
+                }
+            }
+        }
+
+        return $mapped;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function extractBlacklistInlineFilters(array $params): array
+    {
+        $inline = [];
+
+        foreach (array_keys(self::BLACKLIST_EQUAL_FILTERS) as $key) {
+            if (array_key_exists($key, $params) && !is_array($params[$key])) {
+                $inline[$key] = $params[$key];
+            }
+        }
+
+        if (array_key_exists('name', $params) && !is_array($params['name'])) {
+            $inline['name'] = ['like' => $params['name']];
+        }
+
+        if (isset($params['created_at']) && is_array($params['created_at'])) {
+            $inline['created_at'] = $params['created_at'];
+        }
+
+        foreach (['created_at_gte' => 'gte', 'created_at_lte' => 'lte'] as $key => $operator) {
+            if (array_key_exists($key, $params)) {
+                if (!isset($inline['created_at'])) {
+                    $inline['created_at'] = [];
+                }
+                $inline['created_at'][$operator] = $params[$key];
+            }
+        }
+
+        return $inline;
+    }
+
+    private function normalizeBoolean(mixed $value): ?bool
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_numeric($value)) {
+            return (int) $value === 1;
+        }
+
+        if (is_string($value)) {
+            $normalized = strtolower(trim($value));
+            if ($normalized === '') {
+                return null;
+            }
+
+            if (in_array($normalized, ['1', 'true', 'yes', 'sim'], true)) {
+                return true;
+            }
+
+            if (in_array($normalized, ['0', 'false', 'no', 'nao'], true)) {
+                return false;
+            }
+        }
+
+        return null;
+    }
+
+    private function sanitizeWhatsapp(mixed $value): string
+    {
+        if (!is_scalar($value)) {
+            return '';
+        }
+
+        $digits = preg_replace('/\D+/', '', (string) $value);
+
+        return $digits ?? '';
     }
 
     /**
