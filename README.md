@@ -1,107 +1,102 @@
-# Evy API
+﻿# Evy API
 
-Slim 4 based REST API that proxies requests to the Evydencia CRM and exposes a consistent, observable interface with API Key protection and rate limiting. The current surface area covers health monitoring, order workflows, sold-items reporting and campaign scheduling.
+API REST construída com Slim 4 e PHP-DI que expõe um conjunto de integrações com o CRM Evydencia e recursos locais persistidos em MySQL. Todas as respostas utilizam um envelope padronizado, incluem correlação de requisições (`Trace-Id`) e respeitam controles de autenticação e rate limiting.
 
-## Table of contents
+## Sumário
 
-- [Features](#features)
-- [Project layout](#project-layout)
-- [Getting started](#getting-started)
-  - [Requirements](#requirements)
-  - [Installation](#installation)
-  - [Configuration](#configuration)
-  - [Run locally](#run-locally)
-- [Response contract](#response-contract)
-  - [Success envelope](#success-envelope)
-  - [Error envelope](#error-envelope)
-  - [Pagination and filtering DSL](#pagination-and-filtering-dsl)
-- [CRM integration details](#crm-integration-details)
-- [HTTP endpoints](#http-endpoints)
+- [Principais funcionalidades](#principais-funcionalidades)
+- [Arquitetura e organização](#arquitetura-e-organização)
+- [Requisitos](#requisitos)
+- [Configuração](#configuração)
+- [Execução local](#execução-local)
+- [Contrato de resposta](#contrato-de-resposta)
+- [Integração com o CRM Evydencia](#integração-com-o-crm-evydencia)
+- [Endpoints HTTP](#endpoints-http)
   - [/health](#health)
-  - [/v1/orders/search](#v1orderssearch)
-  - [/v1/orders/{uuid}](#v1ordersuuid)
-  - [/v1/orders/{uuid}/status](#v1ordersuuidstatus)
-  - [/v1/reports/sold-items](#v1reportssold-items)
-  - [/v1/campaigns/schedule](#v1campaignsschedule)
-- [Logging & observability](#logging--observability)
-- [Rate limiting](#rate-limiting)
-- [Next steps](#next-steps)
+  - [Recursos do CRM](#recursos-do-crm)
+  - [Blacklist de WhatsApp (recurso local)](#blacklist-de-whatsapp-recurso-local)
+  - [Agendamentos de postagens (recurso local)](#agendamentos-de-postagens-recurso-local)
+- [Banco de dados local](#banco-de-dados-local)
+- [Observabilidade, rate limit e headers úteis](#observabilidade-rate-limit-e-headers-úteis)
+- [Próximos passos sugeridos](#próximos-passos-sugeridos)
 
-## Features
+## Principais funcionalidades
 
-- Slim 4 + PHP-DI bootstrap with explicit container configuration.
-- Uniform response envelope (`success`, `data`, `meta`, `links`, `trace_id`).
-- API Key authentication (header `X-API-Key`) for every `/v1/**` route.
-- Consistent pagination, sorting and filtering DSL (aliases translated to CRM query params).
-- Guzzle HTTP client wrapper (`EvydenciaApiClient`) with 30s timeout, automatic header injection and structured error handling.
-- Request logging middleware (method, path, status, duration, trace_id) with Monolog.
-- Redis-backed rate limiting middleware (per IP + route).
+- **Envelope consistente** em todas as respostas: `success`, `data`, `meta`, `links`, `trace_id`.
+- **Autenticação por API Key** (`X-API-Key`) para todo o namespace `/v1/**`.
+- **Query DSL unificada** com aliases, filtros condicionais (`eq`, `like`, `gte`, `lte`), ordenação e projeção de campos.
+- **Integração com Evydencia CRM** via cliente Guzzle tipado, incluindo controle de tempo limite, headers automáticos e tratamento estruturado de erros.
+- **Recursos locais** persistidos em MySQL: blacklist de WhatsApp e agendamentos de postagens.
+- **Cache e ETag** para o listing de agendamentos, utilizando Redis opcionalmente.
+- **Idempotência** em `POST /v1/blacklist` via header `Idempotency-Key` para evitar duplicações por número de WhatsApp.
+- **Rate limiting** baseado em Redis (por IP + rota) com exposição dos headers `X-RateLimit-*`.
+- **Logs estruturados** (Monolog) registrando método, caminho, status, duração e `trace_id` em `var/logs/app.log`.
 
-## Project layout
+## Arquitetura e organização
 
 ```
 app/
-  Actions/                # HTTP handlers grouped by domain (Orders, Reports, Campaigns, Health)
-  Application/            # DTOs, services (order/report/campaign) and QueryMapper support
-  Domain/                 # Exceptions and repository contracts (orders_map is optional, future work)
-  Infrastructure/         # HTTP client, logging factory, rate limiter, persistence adapters, etc.
-  Middleware/             # API key, rate limiting and request logging middlewares
-  Settings/               # Typed access to configuration arrays
+  Actions/                # Handlers HTTP (CRM, Blacklist, ScheduledPosts, etc.)
+  Application/
+    DTO/                  # Objetos de transporte
+    Services/             # Camadas de orquestração (CRM + recursos locais)
+    Support/              # Utilitários (QueryMapper, ApiResponder, etc.)
+  Domain/
+    Exception/            # Exceções de domínio
+    Repositories/         # Contratos para persistência local
+  Infrastructure/
+    Cache/                # Adapters (Redis cache, rate limiter)
+    Http/                 # Cliente Evydencia
+    Persistence/          # Implementações PDO (MySQL) + migrations
+    Logging/              # LoggerFactory (Monolog)
+  Middleware/             # Autenticação, rate limit, logging
 config/
-  settings.php            # Reads .env and builds the settings array
-  dependencies.php        # PHP-DI bindings
-  middleware.php          # Registers global middlewares and error handler
-  routes.php              # Route definitions
+  dependencies.php        # Bindings do container PHP-DI
+  middleware.php          # Registradores de middleware e error handler
+  routes.php              # Rotas agrupadas por domínio
 public/
-  index.php               # Front controller
-var/logs/                 # Runtime logs (gitignored)
-README.md                 # This file
+  index.php               # Front controller (PHP built-in server)
+var/logs/                 # Logs de runtime (gitignore)
+README.md                 # Este documento
 ```
 
-## Getting started
-
-### Requirements
+## Requisitos
 
 - PHP 8.3+
 - Composer 2.8+
-- Redis (optional, required only if you want rate limiting)
-- MySQL (optional; currently only used for the optional `orders_map` repository)
+- MySQL 8.x (necessário para Blacklist e Scheduled Posts)
+- Redis 6+ (opcional; requerido para rate limiting e cache de agendamentos)
 
-### Installation
+## Configuração
+
+1. Copie `.env.example` para `.env`.
+2. Defina os valores obrigatórios:
+   - `APP_API_KEY`: chave utilizada no header `X-API-Key`.
+   - `CRM_BASE_URL`: URL base do CRM (default `https://evydencia.com/api`).
+   - `CRM_TOKEN`: token de acesso do Evydencia (valor puro, sem o prefixo `Bearer`).
+3. Ajustes opcionais:
+   - `DB_*` para conectar ao MySQL local (ex.: `DB_HOST=127.0.0.1`, `DB_DATABASE=evy`).
+   - `REDIS_*` para habilitar rate limiting e cache (`REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`).
+   - `RATE_LIMIT_PER_MINUTE` caso deseje alterar a janela padrão (60 req/min).
+   - `LOG_*` para customizar canal, caminho e nível dos logs.
+
+## Execução local
 
 ```bash
+# Instalar dependências
 composer install
-```
 
-### Configuration
-
-1. Copy `.env.example` to `.env`.
-2. Set the mandatory values:
-   - `APP_API_KEY`: API key that clients must send in `X-API-Key`.
-   - `CRM_BASE_URL`: defaults to `https://evydencia.com/api`.
-   - `CRM_TOKEN`: Evydencia access token (plain value, no `Bearer`).
-3. Optional adjustments:
-   - `LOG_*` to control Monolog channel, path and level.
-   - `REDIS_*` if rate limiting should use an external Redis.
-   - `DB_*` if you plan to persist data locally (future endpoints).
-
-### Run locally
-
-There are two common options:
-
-```bash
-# PHP built-in server (default port 8080)
-composer start
-
-# or explicitly
+# Executar com o servidor embutido
 php -S 127.0.0.1:8080 -t public
+
+# ou utilize: composer start (target configurado no composer.json)
 ```
 
-With Laragon/Apache, point the virtual host root to `public/` and ensure URL rewriting is enabled (`public/.htaccess`).
+Com Laragon/Apache, aponte o DocumentRoot para `public/` e mantenha o `.htaccess` ativo para roteamento.
 
-## Response contract
+## Contrato de resposta
 
-### Success envelope
+### Sucesso
 
 ```json
 {
@@ -110,26 +105,22 @@ With Laragon/Apache, point the virtual host root to `public/` and ensure URL rew
   "meta": {
     "page": 1,
     "per_page": 50,
-    "total": null,
+    "total": 0,
     "count": 0,
-    "total_pages": null,
-    "source": "crm",
-    "elapsed_ms": 5
+    "total_pages": 0,
+    "source": "api",
+    "elapsed_ms": 7
   },
   "links": {
-    "self": "http://localhost:8080/v1/orders/search?page=1",
-    "next": "http://localhost:8080/v1/orders/search?page=2",
+    "self": "http://localhost:8080/v1/resource",
+    "next": null,
     "prev": null
   },
-  "trace_id": "f0e1d2c3b4a59687"
+  "trace_id": "f30579a9cdbeff69"
 }
 ```
 
-- `meta.source` indicates the upstream (`crm` for Evydencia, `api` for local data).
-- `meta.count` is the number of items returned in `data`.
-- `links` follow the pagination DSL; `next`/`prev` are omitted when unavailable.
-
-### Error envelope
+### Erro (RFC 7807-inspired)
 
 ```json
 {
@@ -138,172 +129,199 @@ With Laragon/Apache, point the virtual host root to `public/` and ensure URL rew
     "code": "unprocessable_entity",
     "message": "Parametros invalidos",
     "errors": [
-      { "field": "page", "message": "deve ser maior ou igual a 1" }
+      { "field": "name", "message": "Nome obrigatorio." }
     ]
   },
-  "trace_id": "d18ed62ebc6345b5"
+  "trace_id": "462941753a7fb274"
 }
 ```
 
-Error codes used today: `unauthorized`, `too_many_requests`, `bad_gateway`, `internal_error`, `not_found`, `conflict`, `unprocessable_entity`.
+## Integração com o CRM Evydencia
 
-### Pagination and filtering DSL
+- Headers automáticos: `Accept: application/json`, `Authorization: {CRM_TOKEN}`, `Trace-Id`.
+- Timeout padrão: 30s (`crm.timeout`).
+- Erros HTTP ≥ 400 disparam `CrmRequestException` com log e mapeamento para 502.
+- Falhas de rede/timeouts resultam em `CrmUnavailableException` (502).
+- O corpo bruto (`raw`) é preservado quando o upstream retorna conteúdo não JSON.
 
-| Concept            | Query parameters                                                                | Notes                                                                                                     |
-|--------------------|----------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------|
-| Pagination         | `page`, `per_page` (defaults: 1 / 50, max per_page = 200)                        | `page[number]` / `page[size]` aliases also accepted.                                                      |
-| Sorting            | `sort=field,-other`                                                              | `-` indicates descending. Order service converts to `field:asc|desc` for the CRM.                         |
-| Basic filters      | `filter[field]=value`                                                            | Mapped via `QueryMapper`; aliases listed below.                                                           |
-| `IN` filters       | `filter[field][in]=a,b,c`                                                        | Converted to comma-separated string.                                                                      |
-| Range filters      | `filter[field][gte|lte]=YYYY-MM-DD` (or `YYYY-MM-DD HH:MM:SS` when applicable)    | Mapped to `order[created-start]`, `order[created-end]`, etc.                                              |
-| Like filters       | `filter[field][like]=text`                                                       | Wrapped with `%text%` before sending to the CRM.                                                          |
-| Projection         | `fields[orders]=uuid,status,customer.name`                                      | Optional; applies to the in-memory result (after CRM response).                                          |
-| Fetch all pages    | `fetch=all` (alias `all=true`)                                                   | Iterates `links.next` until exhaustion or 20 pages (safety cap).                                          |
-| Pass-through raw   | `order[status]=...`, `product[slug]=...`                                        | Already in the CRM format; forwarded untouched.                                                           |
-
-**Alias mapping (Orders):**
-
-```
-status            -> order[status]
-created_start     -> order[created-start]
-created_end       -> order[created-end]
-session_start     -> order[session-start]
-session_end       -> order[session-end]
-selection_start   -> order[selection-start]
-selection_end     -> order[selection-end]
-customer_uuid     -> customer[uuid]
-customer_email    -> customer[email]
-customer_whatsapp -> customer[whatsapp]
-customer_name     -> customer[name]
-product_uuid      -> product[uuid]
-product_name      -> product[name]
-product_slug      -> product[slug]
-product_ref       -> product[reference]
-```
-
-Sold items and campaign endpoints use similar aliases:
-
-```
-Sold items aliases:
-  item_name -> item[name]
-  item_slug -> item[slug]
-  item_ref  -> item[ref]
-  created_at[gte|lte] -> order[created-start|end]
-
-Campaign schedule aliases:
-  campaign_id   -> campaign[id]
-  contact_phone -> contacts[phone]
-```
-
-## CRM integration details
-
-- Base URI: `CRM_BASE_URL` (default `https://evydencia.com/api`).
-- Headers sent on every call: `Accept: application/json`, `Authorization: {CRM_TOKEN}`, `Trace-Id`.
-- Guzzle client: 30s timeout, `http_errors=false`.
-- Wrapper methods: `get`, `post`, `put`, plus convenience helpers (`searchOrders`, `fetchOrderDetail`, etc.).
-- Error handling:
-  - Network/timeout -> throws `CrmUnavailableException` (mapped to 502 Bad Gateway).
-  - HTTP >= 400 -> throws `CrmRequestException` (logged with status + keys present in body).
-  - Non-JSON body is attached to the `raw` key.
-
-## HTTP endpoints
+## Endpoints HTTP
 
 ### /health
 
-| Method | Description              | Auth | Query/body | Response source |
-|--------|--------------------------|------|------------|-----------------|
-| GET    | Liveness/health check.   | No   | N/A        | `meta.source=api`
+| Método | Descrição                  | Auth | Body | Fonte |
+|--------|----------------------------|------|------|-------|
+| GET    | Verifica saúde da API.     | Não  | N/A  | `api` |
 
-**Response example**
+### Recursos do CRM
+
+#### /v1/orders/search
+
+- **GET**: proxy para busca de pedidos no CRM.
+- Autenticação obrigatória.
+- Filtros principais: `filter[status]`, `filter[created_at][gte|lte]`, `customer_email`, `product_slug`, `fetch=all`, paginação (`page`, `per_page`), ordenação (`sort=-created_at`) e projeção (`fields[orders]=id,uuid,status`).
+- Suporta `q` e parâmetros pass-through (`order[status]=...`).
+
+#### /v1/orders/{uuid}
+
+- **GET**: detalhe de pedido (`/orders/{uuid}/detail` no CRM). Acrescenta `local_map` se houver dados no MySQL local.
+
+#### /v1/orders/{uuid}/status
+
+- **PUT**: atualiza status via CRM.
+- Body: `{ "status": "payment_confirmed", "note": "opcional" }`.
+- Valida tamanho de strings, persiste histórico no MySQL opcional (`orders_map`).
+
+#### /v1/reports/sold-items
+
+- **GET**: relatório de itens vendidos.
+- Filtros: `item_name`, `item_slug`, `item_ref`, `created_at[gte|lte]`, `fetch=all`, ordenação.
+
+#### /v1/campaigns/schedule
+
+- **GET**: agenda de campanhas no CRM.
+- Filtros: `campaign_id`, `contact_phone`, DSL de paginação e ordenação.
+
+### Blacklist de WhatsApp (recurso local)
+
+Persistido na tabela `whatsapp_blacklist`.
+
+| Endpoint | Método | Descrição | Auth |
+|----------|--------|-----------|------|
+| `/v1/blacklist` | GET | Lista entradas com filtros e paginação. | Sim |
+| `/v1/blacklist` | POST | Cria nova entrada (idempotente via `Idempotency-Key`). | Sim |
+| `/v1/blacklist/{id}` | GET | Detalha registro pelo `id`. | Sim |
+| `/v1/blacklist/{id}` | PUT/PATCH | Atualiza campos parciais. | Sim |
+| `/v1/blacklist/{id}` | DELETE | Remove registro. | Sim |
+
+**Filtros suportados** (QueryMapper converte automaticamente):
+
+- `filter[whatsapp]=5511988887777` (normaliza apenas dígitos).
+- `filter[name][like]=maria` (busca parcial – case insensitive).
+- `filter[has_closed_order][eq]=1`.
+- `filter[created_at][gte]=2025-01-01`, `filter[created_at][lte]=2025-01-31`.
+- `q=texto` (busca em `name` e `whatsapp`).
+- Ordenação (`sort=-created_at`), campos (`fields[blacklist]=id,name,whatsapp`).
+- Headers de saída: `X-Total-Count`, `X-Request-Id`.
+
+**POST /v1/blacklist**
 
 ```json
 {
-  "success": true,
-  "data": {
-    "status": "ok",
-    "timestamp": "2025-10-02T17:10:21+00:00"
-  },
-  "meta": {
-    "page": 1,
-    "per_page": 1,
-    "total": 1,
-    "source": "api"
-  },
-  "links": {
-    "self": "http://localhost:8080/health",
-    "next": null,
-    "prev": null
-  },
-  "trace_id": "1ae52f64d8d14c88"
+  "name": "Maria Silva",
+  "whatsapp": "11988887777",
+  "has_closed_order": true,
+  "observation": "Bloqueio solicitado pelo financeiro"
 }
 ```
 
-### /v1/orders/search
+- `whatsapp` é obrigatório e único (apenas dígitos).
+- Header opcional `Idempotency-Key` evita duplicidade acidental.
 
-| Method | Description                              | Auth | Notes |
-|--------|------------------------------------------|------|-------|
-| GET    | CRM proxy that searches for orders.      | Yes  | Supports full pagination/filter DSL, projection, `fetch=all`.
+### Agendamentos de postagens (recurso local)
 
-**Key query parameters**
+Persistido na tabela `scheduled_posts`. Apoia ETag e cache (Redis).
 
-- `page`, `per_page`, `sort`, `fields[orders]`
-- `filter` aliases listed earlier (`status`, `created_start`, etc.)
-- Raw pass-through (`order[status]=...`)
-- `fetch=all` to iterate up to 20 pages (aggregated locally)
+| Endpoint | Método | Descrição | Auth |
+|----------|--------|-----------|------|
+| `/v1/scheduled-posts` | GET | Lista agendamentos com filtros, ordenação, projeção e ETag. | Sim |
+| `/v1/scheduled-posts` | POST | Cria agendamento (text/image/video). | Sim |
+| `/v1/scheduled-posts/{id}` | GET | Detalha agendamento. | Sim |
+| `/v1/scheduled-posts/{id}` | PUT/PATCH | Atualiza campos parciais. | Sim |
+| `/v1/scheduled-posts/{id}` | DELETE | Remove agendamento. | Sim |
+| `/v1/scheduled-posts/ready` | GET | Retorna posts prontos para disparo (`scheduled_datetime <= NOW()` e `messageId` vazio). | Sim |
+| `/v1/scheduled-posts/{id}/mark-sent` | POST | Marca agendamento como enviado (`zaapId`, `messageId`). | Sim |
 
-**Example**
+**Filtros para GET /v1/scheduled-posts**
 
-```bash
-curl "http://localhost:8080/v1/orders/search?status=payment_confirmed&product_slug=natal&page=1&per_page=50" \
-  -H "X-API-Key: <APP_API_KEY>"
+- `filter[type][eq]=text|image|video`.
+- `filter[scheduled_datetime][gte]`, `filter[scheduled_datetime][lte]`.
+- `filter[messageId][eq]=null` ou `filter[messageId][eq]=!null`.
+- `q=texto` (busca em `message` e `caption`).
+- `sort=-scheduled_datetime`, `fields[scheduled_posts]=id,type,scheduled_datetime`.
+- Headers adicionais: `ETag`, `Cache-Control`, `X-Total-Count`.
+- Envie `If-None-Match` para cache condicional (304 retorna sem corpo).
+
+**POST /v1/scheduled-posts**
+
+- `type` obrigatório (`text`, `image` ou `video`).
+- `scheduled_datetime` obrigatório (validado em `America/Sao_Paulo`).
+- Campos obrigatórios por tipo:
+  - `text`: `message`.
+  - `image`: `image_url`.
+  - `video`: `video_url`.
+- Campos opcionais: `caption`, `zaapId`, `messageId`.
+
+Exemplo (imagem):
+
+```json
+{
+  "type": "image",
+  "image_url": "https://cdn.exemplo.com/post.jpg",
+  "caption": "Campanha de Dia das Mães",
+  "scheduled_datetime": "2025-05-10 09:00:00"
+}
 ```
 
-### /v1/orders/{uuid}
+**POST /v1/scheduled-posts/{id}/mark-sent**
 
-| Method | Description                              | Auth | Body |
-|--------|------------------------------------------|------|------|
-| GET    | Fetches order detail (`/orders/{uuid}/detail`). | Yes | None |
+```json
+{
+  "zaapId": "3D891B2E6D57308A7C4266EA911E9C16",
+  "messageId": "3EB033D81D27B28077223C"
+}
+```
 
-Adds `local_map` if the optional local repository returns data. Returns `source=crm`.
+- `messageId` é obrigatório; `zaapId` opcional.
+- Atualiza `updated_at` e invalida o cache.
 
-### /v1/orders/{uuid}/status
+## Banco de dados local
 
-| Method | Description                                    | Auth | Body |
-|--------|------------------------------------------------|------|------|
-| PUT    | Updates order status via `PUT /order/status`.   | Yes  | `{ "status": "...", "note": "optional" }`
+- Crie o schema `evy` (ou o definido em `DB_DATABASE`).
+- Execute a migration `app/Infrastructure/Persistence/Migrations/20251003_create_blacklist_and_scheduled_posts.sql` ou copie as instruções abaixo:
 
-- `status`: required string 2..64 characters.
-- `note`: optional string up to 255 characters.
-- Sanitises inputs and persists the payload to the optional `orders_map` table if configured.
+```sql
+CREATE TABLE IF NOT EXISTS whatsapp_blacklist (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    name VARCHAR(255) NOT NULL,
+    whatsapp VARCHAR(20) NOT NULL,
+    has_closed_order TINYINT(1) NOT NULL DEFAULT 0,
+    observation TEXT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_whatsapp_blacklist_whatsapp (whatsapp)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-### /v1/reports/sold-items
+CREATE TABLE IF NOT EXISTS scheduled_posts (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    type ENUM('text','image','video') NOT NULL,
+    message TEXT NULL,
+    image_url VARCHAR(255) DEFAULT NULL,
+    video_url VARCHAR(255) DEFAULT NULL,
+    caption VARCHAR(255) DEFAULT NULL,
+    scheduled_datetime DATETIME NOT NULL,
+    zaapId VARCHAR(50) DEFAULT NULL,
+    messageId VARCHAR(50) DEFAULT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_scheduled_posts_datetime (scheduled_datetime),
+    KEY idx_scheduled_posts_message_id (messageId)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
 
-| Method | Description                                 | Auth | Notes |
-|--------|---------------------------------------------|------|-------|
-| GET    | CRM report of sold items.                   | Yes  | Supports aliases `item_name`, `item_slug`, `item_ref`, `created_at[gte|lte]`, plus `fetch=all`.
+## Observabilidade, rate limit e headers úteis
 
-### /v1/campaigns/schedule
+- `Trace-Id`: todas as respostas incluem o mesmo valor utilizado nos logs (`var/logs/app.log`).
+- `X-Request-Id`: exposto em recursos locais (Blacklist/Scheduled Posts) para facilitar rastreio.
+- Rate limiting (`RedisRateLimiter`) adiciona `X-RateLimit-Limit`, `X-RateLimit-Remaining` e `X-RateLimit-Reset`.
+- Logs são gravados em `var/logs/app.log`, contendo método, path, status, duração (ms) e trace_id.
+- Em caso de 304 (ETag), a resposta não traz corpo e preserva os cabeçalhos de contexto.
 
-| Method | Description                               | Auth | Notes |
-|--------|-------------------------------------------|------|-------|
-| GET    | CRM campaign scheduling information.      | Yes  | Filters: `campaign_id`, `contact_phone`, pagination DSL, `fetch=all`.
+## Próximos passos sugeridos
 
-## Logging & observability
-
-- `RequestLoggingMiddleware` logs one line per request (`method`, `path`, `status`, `duration_ms`, `trace_id`).
-- Every response includes the same `Trace-Id` header/value for correlation.
-- Errors are converted to the JSON problem response and recorded via Monolog.
-
-## Rate limiting
-
-- Controlled by `RATE_LIMIT_PER_MINUTE` (default 60 req/min) and `rate_limit.window` (default 60s).
-- Keys on `rate_limit:{IP_HASH}:{ENDPOINT_HASH}` in Redis.
-- When the limit is reached, returns `429 Too Many Requests` with headers `Retry-After`, `X-RateLimit-*`.
-- If Redis is not configured, the middleware short-circuits, effectively disabling the limit.
-
-## Next steps
-
-- Implement local MySQL-backed resources (blacklist, scheduled posts) using the existing repository contracts.
-- Add automated tests for QueryMapper edge cases, services and middleware behaviour.
-- Provide Docker Compose for PHP + Redis + MySQL to ease onboarding.
-- Extend logging with structured context (correlation IDs, upstream timings).
+1. Automatizar testes (unitários/integrados) para QueryMapper, Services e Actions recém adicionados.
+2. Disponibilizar um script/migration runner para inicializar as tabelas locais automaticamente.
+3. Documentar cenários de idempotência (`Idempotency-Key`) e estratégias de retry na API de Blacklist.
+4. Adicionar exemplos de consumo em Postman/Insomnia com coleções já parametrizadas.
+5. Considerar docker-compose com PHP + MySQL + Redis para facilitar onboarding.
