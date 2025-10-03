@@ -1,0 +1,44 @@
+[2025-10-03T00:54:20.250521+00:00] evy-api.WARNING: Unauthorized request blocked by API key middleware {"trace_id":"c8bf40e9e47e4471","ip":"127.0.0.1","path":"/health"} {"uid":"fe02f18"}
+[2025-10-03T00:54:20.254196+00:00] evy-api.INFO: HTTP request handled {"trace_id":"c8bf40e9e47e4471","method":"GET","path":"/health","status":401,"duration_ms":4} {"uid":"fe02f18"}
+[2025-10-03T00:54:28.392603+00:00] evy-api.WARNING: Unauthorized request blocked by API key middleware {"trace_id":"fdca1c8acc70184a","ip":"::1","path":"/health"} {"uid":"71f848b"}
+[2025-10-03T00:54:28.395258+00:00] evy-api.INFO: HTTP request handled {"trace_id":"fdca1c8acc70184a","method":"GET","path":"/health","status":401,"duration_ms":3} {"uid":"71f848b"}
+[2025-10-03T00:54:29.689536+00:00] evy-api.WARNING: Unauthorized request blocked by API key middleware {"trace_id":"1b8a715c46746709","ip":"::1","path":"/health"} {"uid":"97d558e"}
+[2025-10-03T00:54:29.692033+00:00] evy-api.INFO: HTTP request handled {"trace_id":"1b8a715c46746709","method":"GET","path":"/health","status":401,"duration_ms":3} {"uid":"97d558e"}
+[2025-10-03T00:54:31.284702+00:00] evy-api.INFO: HTTP request handled {"trace_id":"081195647a8c6a59","method":"GET","path":"/health","status":200,"duration_ms":1} {"uid":"625d066"}
+[2025-10-03T00:54:32.955772+00:00] evy-api.WARNING: Unauthorized request blocked by API key middleware {"trace_id":"927700bbe2b38e7c","ip":"::1","path":"/health"} {"uid":"86e8697"}
+[2025-10-03T00:54:32.957901+00:00] evy-api.INFO: HTTP request handled {"trace_id":"927700bbe2b38e7c","method":"GET","path":"/health","status":401,"duration_ms":2} {"uid":"86e8697"}
+[2025-10-03T00:54:33.797056+00:00] evy-api.WARNING: Unauthorized request blocked by API key middleware {"trace_id":"f43406c1fb7d9e6b","ip":"::1","path":"/health"} {"uid":"06f7c84"}
+[2025-10-03T00:54:33.800851+00:00] evy-api.INFO: HTTP request handled {"trace_id":"f43406c1fb7d9e6b","method":"GET","path":"/health","status":401,"duration_ms":4} {"uid":"06f7c84"}
+[2025-10-03T00:54:34.741508+00:00] evy-api.ERROR: Unhandled exception {"trace_id":"b7d09530886d568d","path":"/v1/orders/search","exception":"[object] (PDOException(code: 1049): SQLSTATE[HY000] [1049] Unknown database 'evy' at C:\\laragon\\www\\evy-api\\config\\dependencies.php:50)"} {"uid":"a2cb25f"}
+[2025-10-03T00:55:03.064290+00:00] evy-api.WARNING: CRM responded with an error status {"trace_id":"cada3204d24e3e92","method":"GET","uri":"reports/sold-items","status_code":422,"payload_keys":["message","errors"]} {"uid":"0e66f09"}
+[2025-10-03T00:55:03.067348+00:00] evy-api.INFO: HTTP request handled {"trace_id":"cada3204d24e3e92","method":"GET","path":"/v1/reports/sold-items","status":502,"duration_ms":847} {"uid":"0e66f09"}
+[2025-10-03T00:55:07.803655+00:00] evy-api.WARNING: CRM responded with an error status {"trace_id":"e9549b1aeb01b4fd","method":"GET","uri":"reports/sold-items","status_code":422,"payload_keys":["message","errors"]} {"uid":"a146879"}
+[2025-10-03T00:55:07.806030+00:00] evy-api.INFO: HTTP request handled {"trace_id":"e9549b1aeb01b4fd","method":"GET","path":"/v1/reports/sold-items","status":502,"duration_ms":629} {"uid":"a146879"}
+[2025-10-03T00:55:11.813523+00:00] evy-api.WARNING: CRM responded with an error status {"trace_id":"0ed90415427c3c78","method":"GET","uri":"campaigns/schedule/search","status_code":422,"payload_keys":["message","errors"]} {"uid":"682930c"}
+[2025-10-03T00:55:11.816191+00:00] evy-api.INFO: HTTP request handled {"trace_id":"0ed90415427c3c78","method":"GET","path":"/v1/campaigns/schedule","status":502,"duration_ms":651} {"uid":"682930c"}
+[2025-10-03T00:55:15.317682+00:00] evy-api.ERROR: Unhandled exception {"trace_id":"bf8cf0a1f7ed89b2","path":"/v1/orders/00000000-0000-0000-0000-000000000000","exception":"[object] (PDOException(code: 1049): SQLSTATE[HY000] [1049] Unknown database 'evy' at C:\\laragon\\www\\evy-api\\config\\dependencies.php:50)"} {"uid":"1b8b927"}
+[2025-10-03T00:55:20.155444+00:00] evy-api.WARNING: Unauthorized request blocked by API key middleware {"trace_id":"e06f3f8aaaefe45b","ip":"::1","path":"/health"} {"uid":"3bbcf57"}
+[2025-10-03T00:55:20.158127+00:00] evy-api.INFO: HTTP request handled {"trace_id":"e06f3f8aaaefe45b","method":"GET","path":"/health","status":401,"duration_ms":3} {"uid":"3bbcf57"}
+[2025-10-03T00:55:20.993562+00:00] evy-api.WARNING: Unauthorized request blocked by API key middleware {"trace_id":"19358edf7e47bb20","ip":"::1","path":"/health"} {"uid":"79b9369"}
+[2025-10-03T00:55:20.995637+00:00] evy-api.INFO: HTTP request handled {"trace_id":"19358edf7e47bb20","method":"GET","path":"/health","status":401,"duration_ms":2} {"uid":"79b9369"}
+[2025-10-03T00:55:21.684149+00:00] evy-api.WARNING: Unauthorized request blocked by API key middleware {"trace_id":"d1adda3a52eb259c","ip":"::1","path":"/health"} {"uid":"c193699"}
+[2025-10-03T00:55:21.686783+00:00] evy-api.INFO: HTTP request handled {"trace_id":"d1adda3a52eb259c","method":"GET","path":"/health","status":401,"duration_ms":3} {"uid":"c193699"}
+[2025-10-03T00:55:41.326103+00:00] evy-api.WARNING: Unauthorized request blocked by API key middleware {"trace_id":"d9d5eb551e3b4ae3","ip":"::1","path":"/health"} {"uid":"b105ced"}
+[2025-10-03T00:55:41.328381+00:00] evy-api.INFO: HTTP request handled {"trace_id":"d9d5eb551e3b4ae3","method":"GET","path":"/health","status":401,"duration_ms":3} {"uid":"b105ced"}
+[2025-10-03T00:55:42.411397+00:00] evy-api.WARNING: Unauthorized request blocked by API key middleware {"trace_id":"03ab7ba912dc1579","ip":"::1","path":"/health"} {"uid":"c32ad2e"}
+[2025-10-03T00:55:42.413489+00:00] evy-api.INFO: HTTP request handled {"trace_id":"03ab7ba912dc1579","method":"GET","path":"/health","status":401,"duration_ms":2} {"uid":"c32ad2e"}
+[2025-10-03T00:55:45.868620+00:00] evy-api.WARNING: CRM responded with an error status {"trace_id":"1cfb5a4bf38abd3e","method":"GET","uri":"orders/search","status_code":422,"payload_keys":["message","errors"]} {"uid":"d80fbd5"}
+[2025-10-03T00:55:45.871288+00:00] evy-api.INFO: HTTP request handled {"trace_id":"1cfb5a4bf38abd3e","method":"GET","path":"/v1/orders/search","status":502,"duration_ms":630} {"uid":"d80fbd5"}
+[2025-10-03T00:55:54.459804+00:00] evy-api.INFO: HTTP request handled {"trace_id":"365a04a6b81b1377","method":"GET","path":"/v1/orders/search","status":200,"duration_ms":1200} {"uid":"e2f210d"}
+[2025-10-03T00:55:58.747664+00:00] evy-api.WARNING: Unauthorized request blocked by API key middleware {"trace_id":"529ee61f41aa67fd","ip":"::1","path":"/health"} {"uid":"e5a5e99"}
+[2025-10-03T00:55:58.749802+00:00] evy-api.INFO: HTTP request handled {"trace_id":"529ee61f41aa67fd","method":"GET","path":"/health","status":401,"duration_ms":2} {"uid":"e5a5e99"}
+[2025-10-03T00:55:59.080899+00:00] evy-api.INFO: HTTP request handled {"trace_id":"414025dd809051a8","method":"GET","path":"/v1/orders/f4d0b389-a5bb-43dd-aca7-a46297dfe981","status":200,"duration_ms":709} {"uid":"7927c8e"}
+[2025-10-03T00:55:59.482219+00:00] evy-api.WARNING: Unauthorized request blocked by API key middleware {"trace_id":"66a828cc5639f497","ip":"::1","path":"/health"} {"uid":"ca04c42"}
+[2025-10-03T00:55:59.485538+00:00] evy-api.INFO: HTTP request handled {"trace_id":"66a828cc5639f497","method":"GET","path":"/health","status":401,"duration_ms":4} {"uid":"ca04c42"}
+[2025-10-03T00:56:07.369354+00:00] evy-api.INFO: HTTP request handled {"trace_id":"c9aecda3461f36a0","method":"PUT","path":"/v1/orders/00000000-0000-0000-0000-000000000000/status","status":422,"duration_ms":33} {"uid":"3acbbd8"}
+[2025-10-03T00:58:03.609395+00:00] evy-api.WARNING: Unauthorized request blocked by API key middleware {"trace_id":"3b248d3923a5e035","ip":"::1","path":"/health"} {"uid":"e2733a3"}
+[2025-10-03T00:58:03.611763+00:00] evy-api.INFO: HTTP request handled {"trace_id":"3b248d3923a5e035","method":"GET","path":"/health","status":401,"duration_ms":3} {"uid":"e2733a3"}
+[2025-10-03T00:58:04.483864+00:00] evy-api.WARNING: Unauthorized request blocked by API key middleware {"trace_id":"07da98d6ce8932c8","ip":"::1","path":"/health"} {"uid":"fd0dcca"}
+[2025-10-03T00:58:04.486427+00:00] evy-api.INFO: HTTP request handled {"trace_id":"07da98d6ce8932c8","method":"GET","path":"/health","status":401,"duration_ms":3} {"uid":"fd0dcca"}
+[2025-10-03T00:58:05.299183+00:00] evy-api.WARNING: Unauthorized request blocked by API key middleware {"trace_id":"3a11d63418708088","ip":"::1","path":"/health"} {"uid":"fb3af4f"}
+[2025-10-03T00:58:05.301263+00:00] evy-api.INFO: HTTP request handled {"trace_id":"3a11d63418708088","method":"GET","path":"/health","status":401,"duration_ms":2} {"uid":"fb3af4f"}
