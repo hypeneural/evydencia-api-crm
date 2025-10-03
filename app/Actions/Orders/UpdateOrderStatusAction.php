@@ -6,6 +6,7 @@ namespace App\Actions\Orders;
 
 use App\Application\Services\OrderService;
 use App\Application\Support\ApiResponder;
+use OpenApi\Annotations as OA;
 use App\Domain\Exception\CrmRequestException;
 use App\Domain\Exception\CrmUnavailableException;
 use Psr\Http\Message\ResponseInterface as Response;
@@ -25,6 +26,18 @@ final class UpdateOrderStatusAction
     ) {
     }
 
+    /**
+     * @OA\Put(
+     *     path="/v1/orders/{uuid}/status",
+     *     tags={"Orders"},
+     *     summary="Atualiza o status do pedido no CRM",
+     *     @OA\Parameter(name="uuid", in="path", required=true, description="Identificador do pedido.", @OA\Schema(type="string")),
+     *     @OA\RequestBody(required=true, @OA\JsonContent(ref="#/components/schemas/OrderStatusUpdatePayload")),
+     *     @OA\Response(response=200, description="Status atualizado", @OA\JsonContent(ref="#/components/schemas/GenericResourceResponse")),
+     *     @OA\Response(response=422, description="Parâmetros inválidos", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope")),
+     *     @OA\Response(response=502, description="Erro ao consultar CRM", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope")),
+     *     @OA\Response(response=500, description="Erro interno", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope"))
+     * )
     public function __invoke(Request $request, Response $response): Response
     {
         $traceId = $this->resolveTraceId($request);

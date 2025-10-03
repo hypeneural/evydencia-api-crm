@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
@@ -10,6 +10,7 @@ use App\Actions\Blacklist\UpdateBlacklistEntryAction;
 use App\Actions\Campaigns\AbortScheduledCampaignAction;
 use App\Actions\Campaigns\GetCampaignScheduleAction;
 use App\Actions\Campaigns\ScheduleCampaignAction;
+use App\Actions\Docs\ViewDocsAction;
 use App\Actions\HealthCheckAction;
 use App\Actions\Orders\GetOrderDetailAction;
 use App\Actions\Orders\SearchOrdersAction;
@@ -34,6 +35,7 @@ use Slim\App;
 use Slim\Routing\RouteCollectorProxy;
 
 return function (App $app): void {
+    $app->get('/doc', ViewDocsAction::class);
     $app->get('/health', HealthCheckAction::class);
 
     $app->group('/v1', function (RouteCollectorProxy $group): void {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Reports;
 
 use App\Application\Services\ReportEngine;
+use OpenApi\Annotations as OA;
 use App\Domain\Exception\CrmRequestException;
 use App\Domain\Exception\CrmUnavailableException;
 use App\Domain\Exception\ValidationException;
@@ -28,6 +29,23 @@ final class ExportReportAction
     /**
      * @param array<string, string> $args
      */
+    /**
+     * @OA\Post(
+     *     path="/v1/reports/{key}/export",
+     *     tags={"Reports"},
+     *     summary="Exporta um relatório em CSV ou JSON",
+     *     @OA\Parameter(name="key", in="path", required=true, description="Identificador do relatório.", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="format", in="query", required=false, description="Formato desejado (csv ou json).", @OA\Schema(type="string", enum={"csv","json"}, default="csv")),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Arquivo gerado",
+     *         @OA\MediaType(mediaType="text/csv", @OA\Schema(type="string", format="binary")),
+     *         @OA\MediaType(mediaType="application/json", @OA\Schema(type="string", format="binary"))
+     *     ),
+     *     @OA\Response(response=422, description="Parâmetros inválidos", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope")),
+     *     @OA\Response(response=502, description="Erro no CRM", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope")),
+     *     @OA\Response(response=500, description="Erro interno", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope"))
+     * )
     public function __invoke(Request $request, Response $response, array $args): Response
     {
         $traceId = $this->resolveTraceId($request);

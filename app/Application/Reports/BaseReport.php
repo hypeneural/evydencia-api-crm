@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Application\Reports;
 
 use App\Infrastructure\Http\EvydenciaApiClient;
+use InvalidArgumentException;
 use PDO;
 use PDOException;
 use Predis\Client as PredisClient;
@@ -16,6 +17,8 @@ abstract class BaseReport implements ReportInterface
 {
     protected ReportHelpers $helpers;
 
+    protected EvydenciaApiClient $apiClient;
+
     public function __construct(
         protected readonly EvydenciaApiClient $crm,
         protected readonly ?PDO $pdo,
@@ -23,6 +26,8 @@ abstract class BaseReport implements ReportInterface
         protected readonly LoggerInterface $logger
     ) {
         $this->helpers = new ReportHelpers();
+        // backward compatibility for legacy reports still referencing $this->apiClient
+        $this->apiClient = $crm;
     }
 
     /**
@@ -30,7 +35,49 @@ abstract class BaseReport implements ReportInterface
      */
     protected function fromArray(iterable $items): array
     {
-        return is_array($items) ? $items : iterator_to_array($items, false);
+        return $this->fromIterable($items);
+    }
+
+    /**
+     * @return array<int, mixed>
+     */
+    protected function fromIterable(iterable $items): array
+    {
+        if (is_array($items)) {
+            return $items;
+        }
+
+        return iterator_to_array($items, false);
+    }
+
+    protected function crm(): EvydenciaApiClient
+    {
+        return $this->crm;
+    }
+
+    protected function pdo(): ?PDO
+    {
+        return $this->pdo;
+    }
+
+    protected function redis(): ?PredisClient
+    {
+        return $this->redis;
+    }
+
+    protected function logger(): LoggerInterface
+    {
+        return $this->logger;
+    }
+
+    protected function helpers(): ReportHelpers
+    {
+        return $this->helpers;
+    }
+
+    protected function pipeline(iterable $data): ReportPipeline
+    {
+        return new ReportPipeline($this->fromIterable($data));
     }
 
     /**
@@ -123,16 +170,6 @@ abstract class BaseReport implements ReportInterface
         } catch (PDOException $exception) {
             throw new RuntimeException('Failed to execute MySQL query: ' . $exception->getMessage(), 0, $exception);
         }
-    }
-
-    protected function pipeline(array $data): ReportPipeline
-    {
-        return new ReportPipeline($data);
-    }
-
-    protected function helpers(): ReportHelpers
-    {
-        return $this->helpers;
     }
 
     protected function remember(string $cacheKey, int $ttl, callable $callback): ReportResult
@@ -243,35 +280,98 @@ final class ReportPipeline
         return $this;
     }
 
-    /**
-     * @param callable|null $aggregator function(string $groupKey, array<int, mixed> $items): mixed
-     */
-    public function groupBy(callable $keyResolver, ?callable $aggregator = null): self
+    public function compute(callable $callback): self
     {
+        return $this->map($callback);
+    }
+
+    /**
+     * @param callable|string|array<int, string> $keyResolver
+     * @param callable|array<string, callable>|null $aggregator
+     */
+    public function groupBy(callable|string|array $keyResolver, callable|array|null $aggregator = null): self
+    {
+        $resolver = $this->createGroupKeyResolver($keyResolver);
         $grouped = [];
+
         foreach ($this->data as $item) {
-            $key = $keyResolver($item);
-            if (!is_string($key) && !is_int($key)) {
-                $key = (string) $key;
+            [$hash, $keyPayload] = $resolver($item);
+            if (!isset($grouped[$hash])) {
+                $grouped[$hash] = [
+                    'key' => $keyPayload,
+                    'items' => [],
+                ];
             }
-            $grouped[$key][] = $item;
+
+            $grouped[$hash]['items'][] = $item;
         }
 
-        if ($aggregator !== null) {
-            $result = [];
-            foreach ($grouped as $key => $items) {
-                $result[$key] = $aggregator($key, $items);
-            }
-            $this->data = array_values($result);
-        } else {
-            $this->data = $grouped;
+        if ($aggregator === null) {
+            $this->data = array_values($grouped);
+
+            return $this;
         }
+
+        if (is_callable($aggregator)) {
+            $this->data = array_values(array_map(
+                static fn (array $group) => $aggregator($group['key'], $group['items']),
+                $grouped
+            ));
+
+            return $this;
+        }
+
+        if (is_array($aggregator)) {
+            $this->data = array_values(array_map(function (array $group) use ($aggregator) {
+                $row = [];
+                $keyPayload = $group['key'];
+
+                if (is_array($keyPayload)) {
+                    foreach ($keyPayload as $field => $value) {
+                        $row[$field] = $value;
+                    }
+                } else {
+                    $row['key'] = $keyPayload;
+                }
+
+                foreach ($aggregator as $field => $callback) {
+                    if (!is_callable($callback)) {
+                        throw new InvalidArgumentException('Aggregator for field ' . $field . ' must be callable.');
+                    }
+
+                    $row[$field] = $callback($group['items']);
+                }
+
+                return $row;
+            }, $grouped));
+
+            return $this;
+        }
+
+        throw new InvalidArgumentException('Invalid aggregator provided for groupBy.');
+    }
+
+    public function aggregate(array $aggregators): self
+    {
+        $result = [];
+
+        foreach ($aggregators as $field => $callback) {
+            if (!is_callable($callback)) {
+                throw new InvalidArgumentException('Aggregator for field ' . $field . ' must be callable.');
+            }
+
+            $result[$field] = $callback($this->data);
+        }
+
+        $this->data = [$result];
 
         return $this;
     }
 
     public function sort(string $field, string $direction = 'asc'): self
     {
+        $direction = strtolower($direction) === 'desc' ? 'desc' : 'asc';
+
         usort($this->data, static function ($left, $right) use ($field, $direction): int {
             $l = is_array($left) ? ($left[$field] ?? null) : null;
             $r = is_array($right) ? ($right[$field] ?? null) : null;
@@ -306,9 +406,8 @@ final class ReportPipeline
         $perPage = max(1, $perPage);
 
         $offset = ($page - 1) * $perPage;
-        $slice = array_slice($this->data, $offset, $perPage);
 
-        return $slice;
+        return array_slice($this->data, $offset, $perPage);
     }
 
     /**
@@ -317,5 +416,46 @@ final class ReportPipeline
     public function toArray(): array
     {
         return $this->data;
+    }
+
+    private function createGroupKeyResolver(callable|string|array $keyResolver): callable
+    {
+        if (is_callable($keyResolver)) {
+            return function ($item) use ($keyResolver): array {
+                $resolved = $keyResolver($item);
+                $normalized = $this->normalizeGroupKey($resolved);
+
+                return [$this->hashGroupKey($normalized), $normalized];
+            };
+        }
+
+        $fields = is_array($keyResolver) ? array_values($keyResolver) : [$keyResolver];
+
+        return function ($item) use ($fields): array {
+            $normalized = [];
+            foreach ($fields as $field) {
+                $value = null;
+                if (is_array($item) && array_key_exists($field, $item)) {
+                    $value = $item[$field];
+                }
+                $normalized[$field] = $value;
+            }
+
+            return [$this->hashGroupKey($normalized), $normalized];
+        };
+    }
+
+    private function normalizeGroupKey(mixed $key): mixed
+    {
+        if (is_array($key)) {
+            return $key;
+        }
+
+        return ['key' => $key];
+    }
+
+    private function hashGroupKey(mixed $key): string
+    {
+        return sha1((string) json_encode($key, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
     }
 }

@@ -6,6 +6,7 @@ namespace App\Actions\ScheduledPosts;
 
 use App\Application\Services\ScheduledPostService;
 use App\Application\Support\ApiResponder;
+use OpenApi\Annotations as OA;
 use App\Domain\Exception\NotFoundException;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -22,6 +23,25 @@ final class DeleteScheduledPostAction
     ) {
     }
 
+    /**
+     * @OA\Delete(
+     *     path="/v1/scheduled-posts/{id}",
+     *     tags={"ScheduledPosts"},
+     *     summary="Remove um agendamento",
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer", minimum=1)),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Operação concluída",
+     *         @OA\JsonContent(
+     *             allOf={
+     *                 @OA\Schema(ref="#/components/schemas/SuccessEnvelope"),
+     *                 @OA\Schema(@OA\Property(property="data", type="object", @OA\Property(property="deleted", type="boolean", example=true)))
+     *             }
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Registro não encontrado", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope")),
+     *     @OA\Response(response=422, description="Identificador inválido", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope"))
+     * )
     public function __invoke(Request $request, Response $response): Response
     {
         $traceId = $this->resolveTraceId($request);

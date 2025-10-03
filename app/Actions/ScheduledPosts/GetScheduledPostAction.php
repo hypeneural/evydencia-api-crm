@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\ScheduledPosts;
 
 use App\Application\Services\ScheduledPostService;
+use OpenApi\Annotations as OA;
 use App\Application\Support\ApiResponder;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -18,6 +19,16 @@ final class GetScheduledPostAction
     ) {
     }
 
+    /**
+     * @OA\Get(
+     *     path="/v1/scheduled-posts/{id}",
+     *     tags={"ScheduledPosts"},
+     *     summary="Busca um agendamento específico",
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer", minimum=1)),
+     *     @OA\Response(response=200, description="Registro encontrado", @OA\JsonContent(ref="#/components/schemas/ScheduledPostResourceResponse")),
+     *     @OA\Response(response=404, description="Registro não encontrado", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope")),
+     *     @OA\Response(response=422, description="Identificador inválido", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope"))
+     * )
     public function __invoke(Request $request, Response $response): Response
     {
         $traceId = $this->resolveTraceId($request);

@@ -6,6 +6,7 @@ namespace App\Actions\ScheduledPosts;
 
 use App\Application\Services\ScheduledPostService;
 use App\Application\Support\ApiResponder;
+use OpenApi\Annotations as OA;
 use App\Domain\Exception\ValidationException;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -21,6 +22,21 @@ final class CreateScheduledPostAction
     ) {
     }
 
+    /**
+     * @OA\Post(
+     *     path="/v1/scheduled-posts",
+     *     tags={"ScheduledPosts"},
+     *     summary="Cria um novo agendamento",
+     *     @OA\RequestBody(required=true, @OA\JsonContent(ref="#/components/schemas/ScheduledPostCreatePayload")),
+     *     @OA\Response(
+     *         response=201,
+     *         description="Agendamento criado",
+     *         @OA\Header(header="Location", description="URL do recurso criado.", @OA\Schema(type="string", format="uri")),
+     *         @OA\JsonContent(ref="#/components/schemas/ScheduledPostResourceResponse")
+     *     ),
+     *     @OA\Response(response=422, description="Parâmetros inválidos", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope")),
+     *     @OA\Response(response=500, description="Erro interno", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope"))
+     * )
     public function __invoke(Request $request, Response $response): Response
     {
         $traceId = $this->resolveTraceId($request);

@@ -8,6 +8,7 @@ use App\Actions\Concerns\HandlesListAction;
 use App\Application\Services\ScheduledPostService;
 use App\Application\Support\ApiResponder;
 use App\Application\Support\QueryMapper;
+use OpenApi\Annotations as OA;
 use App\Domain\Exception\ValidationException;
 use App\Infrastructure\Cache\ScheduledPostCache;
 use Psr\Http\Message\ResponseInterface as Response;
@@ -28,6 +29,33 @@ final class ListScheduledPostsAction
     ) {
     }
 
+    /**
+     * @OA\Get(
+     *     path="/v1/scheduled-posts",
+     *     tags={"ScheduledPosts"},
+     *     summary="Lista agendamentos de disparos",
+     *     @OA\Parameter(name="page", in="query", required=false, description="Página atual (>=1)", @OA\Schema(type="integer", minimum=1, default=1)),
+     *     @OA\Parameter(name="per_page", in="query", required=false, description="Itens por página (1-200)", @OA\Schema(type="integer", minimum=1, maximum=200, default=50)),
+     *     @OA\Parameter(name="fetch", in="query", required=false, description="Use 'all' para retornar todos os itens de uma vez.", @OA\Schema(type="string", enum={"all"})),
+     *     @OA\Parameter(name="q", in="query", required=false, description="Busca por mensagem/caption.", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="sort", in="query", required=false, description="Ordenação ex.: 'scheduled_datetime,-id'", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="fields", in="query", required=false, description="Campos desejados (ex.: fields=id,type).", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="filter[type]", in="query", required=false, description="Filtra por tipo (text,image,video).", @OA\Schema(type="string", enum={"text","image","video"})),
+     *     @OA\Parameter(name="filter[scheduled_datetime][gte]", in="query", required=false, description="Data inicial (YYYY-MM-DD HH:MM:SS).", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="filter[scheduled_datetime][lte]", in="query", required=false, description="Data final (YYYY-MM-DD HH:MM:SS).", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="filter[message_id_state]", in="query", required=false, description="Filtra por entregues (not_null) ou pendentes (null).", @OA\Schema(type="string", enum={"null","not_null"})),
+     *     @OA\Parameter(name="If-None-Match", in="header", required=false, description="Cache condicional via ETag.", @OA\Schema(type="string")),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Lista paginada",
+     *         @OA\Header(header="X-Total-Count", description="Total de registros.", @OA\Schema(type="integer")),
+     *         @OA\Header(header="ETag", description="Hash da versão da lista.", @OA\Schema(type="string")),
+     *         @OA\JsonContent(ref="#/components/schemas/ScheduledPostListResponse")
+     *     ),
+     *     @OA\Response(response=304, description="Conteúdo não modificado"),
+     *     @OA\Response(response=422, description="Parâmetros inválidos", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope")),
+     *     @OA\Response(response=500, description="Erro interno", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope"))
+     * )
     public function __invoke(Request $request, Response $response): Response
     {
         $traceId = $this->resolveTraceId($request);

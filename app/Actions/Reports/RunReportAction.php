@@ -7,6 +7,7 @@ namespace App\Actions\Reports;
 use App\Application\Services\ReportEngine;
 use App\Application\Reports\ReportResult;
 use App\Application\Support\ApiResponder;
+use OpenApi\Annotations as OA;
 use App\Domain\Exception\CrmRequestException;
 use App\Domain\Exception\CrmUnavailableException;
 use App\Domain\Exception\ValidationException;
@@ -27,6 +28,21 @@ final class RunReportAction
     /**
      * @param array<string, string> $args
      */
+    /**
+     * @OA\Get(
+     *     path="/v1/reports/{key}",
+     *     tags={"Reports"},
+     *     summary="Executa um relatório",
+     *     @OA\Parameter(name="key", in="path", required=true, description="Identificador do relatório.", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="page", in="query", required=false, @OA\Schema(type="integer", minimum=1, default=1)),
+     *     @OA\Parameter(name="per_page", in="query", required=false, @OA\Schema(type="integer", minimum=1, maximum=500, default=50)),
+     *     @OA\Parameter(name="sort", in="query", required=false, description="Ordenação dinâmica (ex.: '-created_at').", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="_cache_enabled", in="query", required=false, description="Define se o cache deve ser usado (true/false).", @OA\Schema(type="boolean")),
+     *     @OA\Response(response=200, description="Execução bem-sucedida", @OA\JsonContent(ref="#/components/schemas/ReportRunPayload")),
+     *     @OA\Response(response=422, description="Parâmetros inválidos", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope")),
+     *     @OA\Response(response=502, description="Erro no CRM ou fonte externa", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope")),
+     *     @OA\Response(response=500, description="Erro interno", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope"))
+     * )
     public function __invoke(Request $request, Response $response, array $args): Response
     {
         $traceId = $this->resolveTraceId($request);

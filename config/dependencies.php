@@ -12,6 +12,7 @@ use App\Application\Services\WhatsAppService;
 use App\Application\Support\ApiResponder;
 use App\Application\Support\CampaignSchedulePayloadNormalizer;
 use App\Application\Support\QueryMapper;
+use App\Middleware\OpenApiValidationMiddleware;
 use App\Domain\Repositories\BlacklistRepositoryInterface;
 use App\Domain\Repositories\OrderRepositoryInterface;
 use App\Domain\Repositories\ScheduledPostRepositoryInterface;
@@ -219,6 +220,34 @@ return static function (ContainerBuilder $containerBuilder): void {
                 $container->get(LoggerInterface::class)
             );
         },
+        OpenApiValidationMiddleware::class => static function (ContainerInterface $container): OpenApiValidationMiddleware {
+
+            $config = $container->get(Settings::class)->getOpenApi();
+
+            $specPath = $config['spec_path'] ?? dirname(__DIR__) . '/public/openapi.json';
+
+            $validateRequests = (bool) ($config['validate_requests'] ?? false);
+
+            $validateResponses = (bool) ($config['validate_responses'] ?? false);
+
+
+
+            return new OpenApiValidationMiddleware(
+
+                $container->get(ApiResponder::class),
+
+                $container->get(LoggerInterface::class),
+
+                $specPath,
+
+                $validateRequests,
+
+                $validateResponses
+
+            );
+
+        },
+
     ]);
 };
 

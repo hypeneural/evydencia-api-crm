@@ -1,15 +1,46 @@
 <?php
-
 declare(strict_types=1);
 
 namespace App\Actions;
 
 use DateTimeImmutable;
+use OpenApi\Annotations as OA;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 
 final class HealthCheckAction
 {
+    /**
+     * @OA\Get(
+     *     path="/health",
+     *     tags={"Health"},
+     *     summary="Verifica disponibilidade da API",
+     *     description="Retorna o status atual da API e um identificador de rastreamento.",
+     *     security={},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Serviço operacional",
+     *         @OA\JsonContent(
+     *             allOf={
+     *                 @OA\Schema(ref="#/components/schemas/SuccessEnvelope"),
+     *                 @OA\Schema(
+     *                     @OA\Property(
+     *                         property="data",
+     *                         type="object",
+     *                         @OA\Property(property="status", type="string", example="ok"),
+     *                         @OA\Property(property="timestamp", type="string", format="date-time", example="2025-10-03T18:20:00Z")
+     *                     )
+     *                 )
+     *             ]
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Erro interno",
+     *         @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope")
+     *     )
+     * )
+     */
     public function __invoke(Request $request, Response $response): Response
     {
         $traceId = $this->resolveTraceId($request);

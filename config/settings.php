@@ -62,6 +62,17 @@ return [
         'allow_credentials' => filter_var($_ENV['CORS_ALLOW_CREDENTIALS'] ?? false, FILTER_VALIDATE_BOOL),
         'max_age' => (int) ($_ENV['CORS_MAX_AGE'] ?? 86400),
     ],
+    'openapi' => [
+        'spec_path' => dirname(__DIR__) . '/public/openapi.json',
+        'validate_requests' => filter_var(
+            $_ENV['OPENAPI_VALIDATE_REQUESTS'] ?? (((($_ENV['APP_ENV'] ?? 'production') !== 'production') ? 'true' : 'false')),
+            FILTER_VALIDATE_BOOL
+        ),
+        'validate_responses' => filter_var(
+            $_ENV['OPENAPI_VALIDATE_RESPONSES'] ?? 'false',
+            FILTER_VALIDATE_BOOL
+        ),
+    ],
 ];
 
 

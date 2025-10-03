@@ -1,5 +1,4 @@
 <?php
-
 declare(strict_types=1);
 
 namespace App\Actions\Blacklist;
@@ -8,6 +7,7 @@ use App\Application\Services\BlacklistService;
 use App\Application\Support\ApiResponder;
 use App\Domain\Exception\ConflictException;
 use App\Domain\Exception\ValidationException;
+use OpenApi\Annotations as OA;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Log\LoggerInterface;
@@ -22,6 +22,45 @@ final class CreateBlacklistEntryAction
     ) {
     }
 
+    /**
+     * @OA\Post(
+     *     path="/v1/blacklist",
+     *     tags={"Blacklist"},
+     *     summary="Cria um contato bloqueado",
+     *     @OA\Parameter(name="Idempotency-Key", in="header", description="Chave para garantir idempotência por 24h.", required=false, @OA\Schema(type="string")),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(ref="#/components/schemas/BlacklistCreatePayload")
+     *     ),
+     *     @OA\Response(
+     *         response=201,
+     *         description="Registro criado",
+     *         @OA\Header(header="Location", description="URL do recurso recém-criado.", @OA\Schema(type="string", format="uri")),
+     *         @OA\Header(header="X-Request-Id", description="Trace ID da requisição.", @OA\Schema(type="string")),
+     *         @OA\JsonContent(ref="#/components/schemas/BlacklistResourceResponse")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Registro já existia e foi retornado (idempotência)",
+     *         @OA\JsonContent(ref="#/components/schemas/BlacklistResourceResponse")
+     *     ),
+     *     @OA\Response(
+     *         response=409,
+     *         description="Conflito (WhatsApp duplicado)",
+     *         @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope")
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Parâmetros inválidos",
+     *         @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope")
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Erro interno",
+     *         @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope")
+     *     )
+     * )
+     */
     public function __invoke(Request $request, Response $response): Response
     {
         $traceId = $this->resolveTraceId($request);
@@ -137,7 +176,7 @@ final class CreateBlacklistEntryAction
             return '';
         }
 
-        $digits = preg_replace('/\D+/', '', (string) $value);
+        $digits = preg_replace('/\\D+/', '', (string) $value);
 
         return $digits ?? '';
     }
@@ -179,3 +218,4 @@ final class CreateBlacklistEntryAction
         return $basePath . '/v1/blacklist/' . $identifier;
     }
 }
+

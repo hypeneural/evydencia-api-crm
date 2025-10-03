@@ -6,6 +6,7 @@ namespace App\Actions\WhatsApp;
 
 use App\Application\Services\WhatsAppService;
 use App\Application\Support\ApiResponder;
+use OpenApi\Annotations as OA;
 use App\Domain\Exception\ZapiRequestException;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -23,6 +24,17 @@ final class SendImageStatusAction
     ) {
     }
 
+    /**
+     * @OA\Post(
+     *     path="/v1/whatsapp/status/image",
+     *     tags={"WhatsApp"},
+     *     summary="Envia imagem no status",
+     *     @OA\RequestBody(required=true, @OA\JsonContent(ref="#/components/schemas/WhatsAppStatusImagePayload")),
+     *     @OA\Response(response=200, description="Status publicado", @OA\JsonContent(ref="#/components/schemas/WhatsAppSendResponse")),
+     *     @OA\Response(response=422, description="Parâmetros inválidos", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope")),
+     *     @OA\Response(response=502, description="Falha no provedor Z-API", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope")),
+     *     @OA\Response(response=500, description="Erro interno", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope"))
+     * )
     public function __invoke(Request $request, Response $response): Response
     {
         $traceId = $this->resolveTraceId($request);

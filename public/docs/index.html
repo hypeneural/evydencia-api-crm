@@ -1,0 +1,33 @@
+﻿<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Evydência API Docs</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist/swagger-ui.css">
+  <style>
+    body { margin: 0; background: #ffffff; }
+    .topbar { display: none; }
+    #swagger { height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="swagger"></div>
+  <script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>
+  <script src="https://unpkg.com/swagger-ui-dist/swagger-ui-standalone-preset.js"></script>
+  <script>
+    window.ui = SwaggerUIBundle({
+      url: "/openapi.json",
+      dom_id: "#swagger",
+      presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+      layout: "BaseLayout",
+      docExpansion: "list",
+      defaultModelsExpandDepth: 1,
+      deepLinking: true,
+      supportedSubmitMethods: ["get", "post", "put", "patch", "delete"],
+      tryItOutEnabled: true,
+      displayRequestDuration: true
+    });
+  </script>
+</body>
+</html>

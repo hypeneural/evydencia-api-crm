@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\ScheduledPosts;
 
 use App\Application\Services\ScheduledPostService;
+use OpenApi\Annotations as OA;
 use App\Application\Support\ApiResponder;
 use App\Actions\Concerns\HandlesListAction;
 use Psr\Http\Message\ResponseInterface as Response;
@@ -20,6 +21,19 @@ final class GetReadyScheduledPostsAction
     ) {
     }
 
+    /**
+     * @OA\Get(
+     *     path="/v1/scheduled-posts/ready",
+     *     tags={"ScheduledPosts"},
+     *     summary="Retorna agendamentos prontos para envio",
+     *     @OA\Parameter(name="limit", in="query", required=false, description="Limite de itens retornados (padrão 50).", @OA\Schema(type="integer", minimum=1, default=50)),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Lista de agendamentos prontos",
+     *         @OA\Header(header="X-Total-Count", description="Total retornado.", @OA\Schema(type="integer")),
+     *         @OA\JsonContent(ref="#/components/schemas/ScheduledPostListResponse")
+     *     )
+     * )
     public function __invoke(Request $request, Response $response): Response
     {
         $traceId = $this->resolveTraceId($request);

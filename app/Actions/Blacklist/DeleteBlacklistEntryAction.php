@@ -1,5 +1,4 @@
 <?php
-
 declare(strict_types=1);
 
 namespace App\Actions\Blacklist;
@@ -7,6 +6,7 @@ namespace App\Actions\Blacklist;
 use App\Application\Services\BlacklistService;
 use App\Application\Support\ApiResponder;
 use App\Domain\Exception\NotFoundException;
+use OpenApi\Annotations as OA;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Log\LoggerInterface;
@@ -22,6 +22,32 @@ final class DeleteBlacklistEntryAction
     ) {
     }
 
+    /**
+     * @OA\Delete(
+     *     path="/v1/blacklist/{id}",
+     *     tags={"Blacklist"},
+     *     summary="Remove um contato da blacklist",
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer", minimum=1)),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Operação concluída",
+     *         @OA\JsonContent(
+     *             allOf={
+     *                 @OA\Schema(ref="#/components/schemas/SuccessEnvelope"),
+     *                 @OA\Schema(
+     *                     @OA\Property(
+     *                         property="data",
+     *                         type="object",
+     *                         @OA\Property(property="deleted", type="boolean", example=true)
+     *                     )
+     *                 )
+     *             ]
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Registro não encontrado", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope")),
+     *     @OA\Response(response=422, description="Identificador inválido", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope"))
+     * )
+     */
     public function __invoke(Request $request, Response $response): Response
     {
         $traceId = $this->resolveTraceId($request);
@@ -83,3 +109,4 @@ final class DeleteBlacklistEntryAction
         return $intId > 0 ? $intId : null;
     }
 }
+

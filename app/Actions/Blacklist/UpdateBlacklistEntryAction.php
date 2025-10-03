@@ -1,5 +1,4 @@
 <?php
-
 declare(strict_types=1);
 
 namespace App\Actions\Blacklist;
@@ -9,6 +8,7 @@ use App\Application\Support\ApiResponder;
 use App\Domain\Exception\ConflictException;
 use App\Domain\Exception\NotFoundException;
 use App\Domain\Exception\ValidationException;
+use OpenApi\Annotations as OA;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Log\LoggerInterface;
@@ -26,6 +26,31 @@ final class UpdateBlacklistEntryAction
     ) {
     }
 
+    /**
+     * @OA\Put(
+     *     path="/v1/blacklist/{id}",
+     *     tags={"Blacklist"},
+     *     summary="Atualiza totalmente um contato bloqueado",
+     *     @OA\Parameter(name="id", in="path", required=true, description="Identificador do registro.", @OA\Schema(type="integer", minimum=1)),
+     *     @OA\RequestBody(required=true, @OA\JsonContent(ref="#/components/schemas/BlacklistUpdatePayload")),
+     *     @OA\Response(response=200, description="Registro atualizado", @OA\JsonContent(ref="#/components/schemas/BlacklistResourceResponse")),
+     *     @OA\Response(response=404, description="Registro não encontrado", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope")),
+     *     @OA\Response(response=409, description="Conflito de dados", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope")),
+     *     @OA\Response(response=422, description="Parâmetros inválidos", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope"))
+     * )
+     *
+     * @OA\Patch(
+     *     path="/v1/blacklist/{id}",
+     *     tags={"Blacklist"},
+     *     summary="Atualiza parcialmente um contato bloqueado",
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer", minimum=1)),
+     *     @OA\RequestBody(required=true, @OA\JsonContent(ref="#/components/schemas/BlacklistUpdatePayload")),
+     *     @OA\Response(response=200, description="Registro atualizado", @OA\JsonContent(ref="#/components/schemas/BlacklistResourceResponse")),
+     *     @OA\Response(response=404, description="Registro não encontrado", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope")),
+     *     @OA\Response(response=409, description="Conflito de dados", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope")),
+     *     @OA\Response(response=422, description="Parâmetros inválidos", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope"))
+     * )
+     */
     public function __invoke(Request $request, Response $response): Response
     {
         $traceId = $this->resolveTraceId($request);
@@ -123,7 +148,7 @@ final class UpdateBlacklistEntryAction
 
         if (array_key_exists('whatsapp', $payload)) {
             try {
-                v::stringType()->notEmpty()->regex('/^\\d{10,14}$/')->setName('whatsapp')->assert($this->sanitizeWhatsapp($payload['whatsapp']));
+                v::stringType()->notEmpty()->regex('/^\\\d{10,14}$/')->setName('whatsapp')->assert($this->sanitizeWhatsapp($payload['whatsapp']));
             } catch (NestedValidationException $exception) {
                 $errors[] = [
                     'field' => 'whatsapp',
@@ -220,7 +245,7 @@ final class UpdateBlacklistEntryAction
             return '';
         }
 
-        $digits = preg_replace('/\D+/', '', (string) $value);
+        $digits = preg_replace('/\\D+/', '', (string) $value);
 
         return $digits ?? '';
     }
@@ -247,3 +272,4 @@ final class UpdateBlacklistEntryAction
         return false;
     }
 }
+

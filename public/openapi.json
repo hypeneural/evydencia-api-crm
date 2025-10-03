@@ -1,0 +1,13 @@
+﻿{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Evydência API",
+    "version": "0.0.0",
+    "description": "Execute composer openapi:build para gerar a especificação mais recente."
+  },
+  "servers": [
+    {"url": "http://localhost"}
+  ],
+  "paths": {},
+  "components": {}
+}

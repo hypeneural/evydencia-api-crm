@@ -1,11 +1,11 @@
 <?php
-
 declare(strict_types=1);
 
 namespace App\Actions\Blacklist;
 
 use App\Application\Services\BlacklistService;
 use App\Application\Support\ApiResponder;
+use OpenApi\Annotations as OA;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Slim\Routing\RouteContext;
@@ -18,6 +18,29 @@ final class GetBlacklistEntryAction
     ) {
     }
 
+    /**
+     * @OA\Get(
+     *     path="/v1/blacklist/{id}",
+     *     tags={"Blacklist"},
+     *     summary="Consulta um contato bloqueado",
+     *     @OA\Parameter(name="id", in="path", required=true, description="Identificador numérico do registro.", @OA\Schema(type="integer", minimum=1)),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Registro localizado",
+     *         @OA\JsonContent(ref="#/components/schemas/BlacklistResourceResponse")
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Registro não encontrado",
+     *         @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope")
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Identificador inválido",
+     *         @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope")
+     *     )
+     * )
+     */
     public function __invoke(Request $request, Response $response): Response
     {
         $traceId = $this->resolveTraceId($request);
@@ -29,7 +52,10 @@ final class GetBlacklistEntryAction
                 'message' => 'Identificador invalido.',
             ]]);
         }
-\n        $resource = $this->service->get($id);\n\n        if ($resource === null) {
+
+        $resource = $this->service->get($id);
+
+        if ($resource === null) {
             return $this->responder->notFound($response, $traceId);
         }
 
@@ -70,3 +96,4 @@ final class GetBlacklistEntryAction
         return $intId > 0 ? $intId : null;
     }
 }
+

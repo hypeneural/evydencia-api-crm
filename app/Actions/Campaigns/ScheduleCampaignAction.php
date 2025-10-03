@@ -7,6 +7,7 @@ namespace App\Actions\Campaigns;
 use App\Application\Services\CampaignService;
 use App\Application\Support\ApiResponder;
 use App\Application\Support\CampaignSchedulePayloadNormalizer;
+use OpenApi\Annotations as OA;
 use App\Domain\Exception\CrmRequestException;
 use App\Domain\Exception\CrmUnavailableException;
 use App\Domain\Exception\ValidationException;
@@ -25,6 +26,17 @@ final class ScheduleCampaignAction
     ) {
     }
 
+    /**
+     * @OA\Post(
+     *     path="/v1/campaigns/schedule/execute",
+     *     tags={"Campaigns"},
+     *     summary="Agenda uma nova campanha",
+     *     @OA\RequestBody(required=true, @OA\JsonContent(ref="#/components/schemas/CampaignSchedulePayload")),
+     *     @OA\Response(response=200, description="Campanha agendada", @OA\JsonContent(ref="#/components/schemas/GenericResourceResponse")),
+     *     @OA\Response(response=422, description="Parâmetros inválidos", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope")),
+     *     @OA\Response(response=502, description="Erro no CRM", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope")),
+     *     @OA\Response(response=500, description="Erro interno", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope"))
+     * )
     public function __invoke(Request $request, Response $response): Response
     {
         $traceId = $this->resolveTraceId($request);

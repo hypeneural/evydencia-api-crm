@@ -6,6 +6,7 @@ namespace App\Actions\ScheduledPosts;
 
 use App\Application\Services\ScheduledPostService;
 use App\Application\Support\ApiResponder;
+use OpenApi\Annotations as OA;
 use App\Domain\Exception\NotFoundException;
 use App\Domain\Exception\ValidationException;
 use Psr\Http\Message\ResponseInterface as Response;
@@ -23,6 +24,17 @@ final class MarkScheduledPostSentAction
     ) {
     }
 
+    /**
+     * @OA\Post(
+     *     path="/v1/scheduled-posts/{id}/mark-sent",
+     *     tags={"ScheduledPosts"},
+     *     summary="Marca um agendamento como enviado",
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer", minimum=1)),
+     *     @OA\RequestBody(required=true, @OA\JsonContent(ref="#/components/schemas/MarkScheduledPostSentPayload")),
+     *     @OA\Response(response=200, description="Registro atualizado", @OA\JsonContent(ref="#/components/schemas/ScheduledPostResourceResponse")),
+     *     @OA\Response(response=404, description="Registro não encontrado", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope")),
+     *     @OA\Response(response=422, description="Parâmetros inválidos", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope"))
+     * )
     public function __invoke(Request $request, Response $response): Response
     {
         $traceId = $this->resolveTraceId($request);

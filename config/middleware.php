@@ -6,6 +6,7 @@ use App\Application\Support\ApiResponder;
 use App\Middleware\ApiKeyMiddleware;
 use App\Middleware\RateLimitMiddleware;
 use App\Middleware\RequestLoggingMiddleware;
+use App\Middleware\OpenApiValidationMiddleware;
 use App\Settings\Settings;
 use Middlewares\TrailingSlash;
 use Psr\Http\Message\ResponseInterface;
@@ -31,6 +32,11 @@ return function (App $app): void {
 
     /** @var Settings $settings */
     $settings = $container->get(Settings::class);
+
+    $openApiConfig = $settings->getOpenApi();
+    if (($openApiConfig['validate_requests'] ?? false) || ($openApiConfig['validate_responses'] ?? false)) {
+        $app->add($container->get(OpenApiValidationMiddleware::class));
+    }
     $corsSettings = $settings->getCors();
 
     $allowedOrigins = $corsSettings['allowed_origins'] ?? ['*'];

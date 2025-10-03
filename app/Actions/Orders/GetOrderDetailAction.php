@@ -6,6 +6,7 @@ namespace App\Actions\Orders;
 
 use App\Application\Services\OrderService;
 use App\Application\Support\ApiResponder;
+use OpenApi\Annotations as OA;
 use App\Domain\Exception\CrmRequestException;
 use App\Domain\Exception\CrmUnavailableException;
 use Psr\Http\Message\ResponseInterface as Response;
@@ -23,6 +24,17 @@ final class GetOrderDetailAction
     ) {
     }
 
+    /**
+     * @OA\Get(
+     *     path="/v1/orders/{uuid}",
+     *     tags={"Orders"},
+     *     summary="Obtém detalhes do pedido",
+     *     @OA\Parameter(name="uuid", in="path", required=true, description="Identificador do pedido no CRM.", @OA\Schema(type="string")),
+     *     @OA\Response(response=200, description="Pedido localizado", @OA\JsonContent(ref="#/components/schemas/GenericResourceResponse")),
+     *     @OA\Response(response=404, description="Pedido não encontrado", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope")),
+     *     @OA\Response(response=502, description="Erro ao consultar CRM", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope")),
+     *     @OA\Response(response=500, description="Erro interno", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope"))
+     * )
     public function __invoke(Request $request, Response $response): Response
     {
         $traceId = $this->resolveTraceId($request);

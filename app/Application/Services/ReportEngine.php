@@ -11,6 +11,8 @@ use App\Application\Support\QueryMapper;
 use App\Domain\Exception\ValidationException;
 use App\Infrastructure\Http\EvydenciaApiClient;
 use Closure;
+use ReflectionFunction;
+use ReflectionMethod;
 use GuzzleHttp\Psr7\PumpStream;
 use GuzzleHttp\Psr7\Utils;
 use PDO;
@@ -85,17 +87,15 @@ final class ReportEngine
         $items = [];
         foreach ($this->definitions as $key => $definition) {
             $report = $this->resolveReportInstance($key, $definition);
-            $columns = $definition['columns'] ?? [];
-            if ($report instanceof ReportInterface) {
-                $columns = $report->columns();
-            }
+            $columns = $this->resolveColumnsMeta($definition, $report);
+            $params = $this->resolveParamsSchema($definition, $report);
 
             $items[] = [
                 'key' => $key,
                 'title' => $definition['title'] ?? ($report?->title() ?? $key),
                 'description' => $definition['description'] ?? ($report?->description() ?? ''),
                 'columns' => $columns,
-                'params' => $definition['params'] ?? ($report?->params() ?? []),
+                'params' => $params,
             ];
         }
 
@@ -165,6 +165,16 @@ final class ReportEngine
         $input['fetch'] = $fetchAll ? 'all' : 'page';
 
         $result = $this->executeReport($definition, $report, $input, $traceId, $columnsMeta);
+
+        if ($result->columns === []) {
+            $result->columns = $columnsMeta;
+        } else {
+            $result->columns = $this->normalizeColumnsMeta($result->columns);
+        }
+
+        if ($result->columns === []) {
+            $result->columns = $this->inferColumns($result->data);
+        }
         $result->meta['cache'] = ['hit' => false, 'key' => $cacheKey];
         $result->meta['page'] = $result->meta['page'] ?? $page;
         $result->meta['per_page'] = $result->meta['per_page'] ?? $perPage;
@@ -296,10 +306,14 @@ final class ReportEngine
     private function resolveColumnsMeta(array $definition, ?ReportInterface $report): array
     {
         if ($report !== null) {
-            return $report->columns();
+            return $this->normalizeColumnsMeta($report->columns());
         }
 
-        return $definition['columns'] ?? [];
+        if (isset($definition['columns'])) {
+            return $this->normalizeColumnsMeta($definition['columns']);
+        }
+
+        return [];
     }
 
     /**
@@ -479,7 +493,15 @@ final class ReportEngine
             }
 
             /** @var callable $runner */
-            $result = $runner($this->crm, $this->pdo, $input, $this->helpers);
+            $paramCount = $this->countCallableParameters($runner);
+            $result = match (true) {
+                $paramCount >= 5 => $runner($this->crm, $this->pdo, $input, $this->helpers, $this->redis),
+                $paramCount === 4 => $runner($this->crm, $this->pdo, $input, $this->helpers),
+                $paramCount === 3 => $runner($this->crm, $input, $traceId),
+                $paramCount === 2 => $runner($this->crm, $input),
+                default => $runner($this->crm, $input),
+            };
+
             if (!$result instanceof ReportResult) {
                 throw new RuntimeException('Runner deve retornar ReportResult.');
             }
@@ -516,6 +538,20 @@ final class ReportEngine
         }
 
         return $normalized;
+    }
+
+
+    private function countCallableParameters(callable $callable): int
+    {
+        if (is_array($callable)) {
+            $reflection = new ReflectionMethod($callable[0], $callable[1]);
+        } elseif (is_object($callable) && !$callable instanceof Closure) {
+            $reflection = new ReflectionMethod($callable, '__invoke');
+        } else {
+            $reflection = new ReflectionFunction($callable);
+        }
+
+        return $reflection->getNumberOfParameters();
     }
 
     private function makeCacheKey(string $key, array $query): string
@@ -596,6 +632,77 @@ final class ReportEngine
     }
 
     /**
+     * @param array<int, mixed> $columns
+     * @return array<int, array<string, mixed>>
+     */
+    private function normalizeColumnsMeta(array $columns): array
+    {
+        $normalized = [];
+
+        foreach ($columns as $column) {
+            if (is_string($column)) {
+                $normalized[] = [
+                    'key' => $column,
+                    'label' => $this->humanizeColumnKey($column),
+                    'type' => 'string',
+                ];
+
+                continue;
+            }
+
+            if (!is_array($column)) {
+                continue;
+            }
+
+            $key = $column['key'] ?? null;
+            if ($key === null) {
+                $label = $column['label'] ?? null;
+                if ($label === null) {
+                    continue;
+                }
+
+                $key = $this->normalizeColumnKeyFromLabel((string) $label);
+            }
+
+            $meta = [
+                'key' => (string) $key,
+                'label' => $column['label'] ?? $this->humanizeColumnKey((string) $key),
+                'type' => $column['type'] ?? 'string',
+            ];
+
+            if (array_key_exists('format', $column)) {
+                $meta['format'] = $column['format'];
+            }
+
+            $extra = array_diff_key($column, ['key' => true, 'label' => true, 'type' => true, 'format' => true]);
+            if ($extra !== []) {
+                $meta += $extra;
+            }
+
+            $normalized[] = $meta;
+        }
+
+        return $normalized;
+    }
+
+    private function humanizeColumnKey(string $key): string
+    {
+        $label = preg_replace('/[_\-]+/', ' ', $key);
+        $label = preg_replace('/[\[\]\.]+/', ' ', $label ?? '');
+        $label = preg_replace('/\s+/', ' ', $label ?? '');
+
+        return ucwords(trim((string) $label));
+    }
+
+    private function normalizeColumnKeyFromLabel(string $label): string
+    {
+        $slug = preg_replace('/[^a-zA-Z0-9]+/', '_', strtolower($label));
+        $slug = trim((string) $slug, '_');
+
+        return $slug === '' ? 'column_' . substr(sha1($label), 0, 6) : $slug;
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     private function inferColumns(array $data): array
@@ -606,15 +713,15 @@ final class ReportEngine
 
         $first = $data[0];
         if (!is_array($first)) {
-            return [['key' => 'value', 'label' => 'Value', 'type' => 'string']];
+            return $this->normalizeColumnsMeta([['key' => 'value', 'label' => 'Value', 'type' => 'string']]);
         }
 
         $columns = [];
         foreach (array_keys($first) as $key) {
-            $columns[] = ['key' => $key, 'label' => ucfirst(str_replace('_', ' ', $key)), 'type' => 'string'];
+            $columns[] = ['key' => $key];
         }
 
-        return $columns;
+        return $this->normalizeColumnsMeta($columns);
     }
 
     /**

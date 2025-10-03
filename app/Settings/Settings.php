@@ -88,6 +88,14 @@ final class Settings
         return $this->get('zapi', []);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    public function getOpenApi(): array
+    {
+        return $this->get('openapi', []);
+    }
+
     public function getApiKey(): ?string
     {
         $app = $this->getApp();
