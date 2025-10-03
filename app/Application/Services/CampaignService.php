@@ -66,6 +66,61 @@ final class CampaignService
     }
 
     /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function scheduleCampaign(array $payload, string $traceId): array
+    {
+        try {
+            $apiResponse = $this->apiClient->scheduleCampaign($payload, $traceId);
+            $body = $apiResponse['body'] ?? [];
+            $data = $this->normalizeResource($body);
+
+            return [
+                'status' => $apiResponse['status'] ?? 200,
+                'data' => $data,
+            ];
+        } catch (CrmUnavailableException|CrmRequestException $exception) {
+            throw $exception;
+        } catch (Throwable $exception) {
+            $this->logger->error('Failed to schedule campaign', [
+                'trace_id' => $traceId,
+                'payload_keys' => array_keys($payload),
+                'error' => $exception->getMessage(),
+            ]);
+
+            throw new RuntimeException('Unable to schedule campaign.', 0, $exception);
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function abortScheduledCampaign(string $scheduleId, string $traceId): array
+    {
+        try {
+            $apiResponse = $this->apiClient->abortScheduledCampaign($scheduleId, $traceId);
+            $body = $apiResponse['body'] ?? [];
+            $data = $this->normalizeResource($body);
+
+            return [
+                'status' => $apiResponse['status'] ?? 200,
+                'data' => $data,
+            ];
+        } catch (CrmUnavailableException|CrmRequestException $exception) {
+            throw $exception;
+        } catch (Throwable $exception) {
+            $this->logger->error('Failed to abort scheduled campaign', [
+                'trace_id' => $traceId,
+                'schedule_id' => $scheduleId,
+                'error' => $exception->getMessage(),
+            ]);
+
+            throw new RuntimeException('Unable to abort scheduled campaign.', 0, $exception);
+        }
+    }
+
+    /**
      * @param array<int, mixed> $data
      * @param array<string, mixed> $meta
      * @param array<string, mixed> $links
@@ -107,6 +162,23 @@ final class CampaignService
         }
 
         return [$collected, $currentMeta, $currentLinks];
+    }
+
+    /**
+     * @return array<string, mixed>|array<int, mixed>
+     */
+    private function normalizeResource(mixed $body): array
+    {
+        if (!is_array($body)) {
+            return $body === null ? [] : ['result' => $body];
+        }
+
+        $data = $this->extractData($body);
+        if ($data !== []) {
+            return $data;
+        }
+
+        return $body;
     }
 }
 

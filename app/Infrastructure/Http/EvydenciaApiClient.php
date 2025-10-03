@@ -109,6 +109,47 @@ final class EvydenciaApiClient
     }
 
     /**
+     * @return array{status: int, body: array<string, mixed>|array<int, mixed>, raw?: string}
+     */
+    public function fetchChristmasOrdersWithoutParticipants(string $traceId): array
+    {
+        return $this->get('reports/christmas-orders-without-participants', [], $traceId);
+    }
+
+    /**
+     * @return array{status: int, body: array<string, mixed>|array<int, mixed>, raw?: string}
+     */
+    public function fetchCustomersWithoutChristmasOrders(string $traceId): array
+    {
+        return $this->get('reports/customers-without-christmas-orders', [], $traceId);
+    }
+
+    /**
+     * @return array{status: int, body: array<string, mixed>|array<int, mixed>, raw?: string}
+     */
+    public function fetchCustomersWithChristmasOrders(string $traceId): array
+    {
+        return $this->get('reports/customers-with-christmas-orders', [], $traceId);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array{status: int, body: array<string, mixed>|array<int, mixed>, raw?: string}
+     */
+    public function scheduleCampaign(array $payload, string $traceId): array
+    {
+        return $this->post('campaigns/schedule/execute', $payload, $traceId);
+    }
+
+    /**
+     * @return array{status: int, body: array<string, mixed>|array<int, mixed>, raw?: string}
+     */
+    public function abortScheduledCampaign(string $scheduleId, string $traceId): array
+    {
+        return $this->post(sprintf('campaigns/schedule/%s/abort', $scheduleId), [], $traceId);
+    }
+
+    /**
      * @param array<string, mixed> $options
      * @return array{status: int, body: array<string, mixed>|array<int, mixed>, raw?: string}
      */
@@ -219,4 +260,5 @@ final class EvydenciaApiClient
         }
     }
 }
+
 

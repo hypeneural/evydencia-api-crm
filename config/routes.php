@@ -7,11 +7,16 @@ use App\Actions\Blacklist\DeleteBlacklistEntryAction;
 use App\Actions\Blacklist\GetBlacklistEntryAction;
 use App\Actions\Blacklist\ListBlacklistAction;
 use App\Actions\Blacklist\UpdateBlacklistEntryAction;
+use App\Actions\Campaigns\AbortScheduledCampaignAction;
 use App\Actions\Campaigns\GetCampaignScheduleAction;
+use App\Actions\Campaigns\ScheduleCampaignAction;
 use App\Actions\HealthCheckAction;
 use App\Actions\Orders\GetOrderDetailAction;
 use App\Actions\Orders\SearchOrdersAction;
 use App\Actions\Orders\UpdateOrderStatusAction;
+use App\Actions\Reports\GetChristmasOrdersWithoutParticipantsAction;
+use App\Actions\Reports\GetCustomersWithChristmasOrdersAction;
+use App\Actions\Reports\GetCustomersWithoutChristmasOrdersAction;
 use App\Actions\Reports\GetSoldItemsAction;
 use App\Actions\ScheduledPosts\CreateScheduledPostAction;
 use App\Actions\ScheduledPosts\DeleteScheduledPostAction;
@@ -66,10 +71,16 @@ return function (App $app): void {
 
         $group->group('/reports', function (RouteCollectorProxy $reports): void {
             $reports->get('/sold-items', GetSoldItemsAction::class);
+            $reports->get('/christmas-orders-without-participants', GetChristmasOrdersWithoutParticipantsAction::class);
+            $reports->get('/customers-without-christmas-orders', GetCustomersWithoutChristmasOrdersAction::class);
+            $reports->get('/customers-with-christmas-orders', GetCustomersWithChristmasOrdersAction::class);
         });
 
         $group->group('/campaigns', function (RouteCollectorProxy $campaigns): void {
             $campaigns->get('/schedule', GetCampaignScheduleAction::class);
+            $campaigns->post('/schedule/execute', ScheduleCampaignAction::class);
+            $campaigns->post('/schedule/{id}/abort', AbortScheduledCampaignAction::class);
         });
     });
 };
+
