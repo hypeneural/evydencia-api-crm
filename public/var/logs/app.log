@@ -53,3 +53,5 @@
 [2025-10-03T01:52:52.528134+00:00] evy-api.INFO: HTTP request handled {"trace_id":"e5398c964e846b67","method":"POST","path":"/v1/blacklist","status":422,"duration_ms":16} {"uid":"422d876"}
 [2025-10-03T01:53:59.762405+00:00] evy-api.INFO: HTTP request handled {"trace_id":"13c51f6413a336b4","method":"POST","path":"/v1/blacklist","status":422,"duration_ms":5} {"uid":"dea3c61"}
 [2025-10-03T01:57:25.116183+00:00] evy-api.INFO: HTTP request handled {"trace_id":"e49027c0e873f592","method":"POST","path":"/v1/blacklist","status":422,"duration_ms":20} {"uid":"02535dd"}
+[2025-10-03T14:27:45.437981+00:00] evy-api.INFO: Sending WhatsApp text message {"trace_id":"c77700536314de5a","phone":"*********3954"} {"uid":"9bd2b32"}
+[2025-10-03T14:27:46.173786+00:00] evy-api.INFO: HTTP request handled {"trace_id":"c77700536314de5a","method":"POST","path":"/v1/whatsapp/text","status":200,"duration_ms":758} {"uid":"9bd2b32"}

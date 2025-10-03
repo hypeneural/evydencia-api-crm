@@ -16,6 +16,7 @@ API REST construída com Slim 4 e PHP-DI que expõe um conjunto de integrações
   - [Recursos do CRM](#recursos-do-crm)
   - [Blacklist de WhatsApp (recurso local)](#blacklist-de-whatsapp-recurso-local)
   - [Agendamentos de postagens (recurso local)](#agendamentos-de-postagens-recurso-local)
+- [WhatsApp (Z-API)](#whatsapp-z-api)
 - [Banco de dados local](#banco-de-dados-local)
 - [Observabilidade, rate limit e headers úteis](#observabilidade-rate-limit-e-headers-úteis)
 - [Próximos passos sugeridos](#próximos-passos-sugeridos)
@@ -27,6 +28,7 @@ API REST construída com Slim 4 e PHP-DI que expõe um conjunto de integrações
 - **Query DSL unificada** com aliases, filtros condicionais (`eq`, `like`, `gte`, `lte`), ordenação e projeção de campos.
 - **Integração com Evydencia CRM** via cliente Guzzle tipado, incluindo controle de tempo limite, headers automáticos e tratamento estruturado de erros.
 - **Recursos locais** persistidos em MySQL: blacklist de WhatsApp e agendamentos de postagens.
+- **Integração WhatsApp (Z-API)** para envio de textos, áudios, imagens, documentos e status.
 - **Cache e ETag** para o listing de agendamentos, utilizando Redis opcionalmente.
 - **Idempotência** em `POST /v1/blacklist` via header `Idempotency-Key` para evitar duplicações por número de WhatsApp.
 - **Rate limiting** baseado em Redis (por IP + rota) com exposição dos headers `X-RateLimit-*`.
@@ -77,6 +79,7 @@ README.md                 # Este documento
 3. Ajustes opcionais:
    - `DB_*` para conectar ao MySQL local (ex.: `DB_HOST=127.0.0.1`, `DB_DATABASE=evy`).
    - `REDIS_*` para habilitar rate limiting e cache (`REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`).
+   - `ZAPI_*` para integração com a Z-API (`ZAPI_BASE_URL`, `ZAPI_INSTANCE`, `ZAPI_TOKEN`, `ZAPI_CLIENT_TOKEN`, `ZAPI_TIMEOUT`).
    - `RATE_LIMIT_PER_MINUTE` caso deseje alterar a janela padrão (60 req/min).
    - `LOG_*` para customizar canal, caminho e nível dos logs.
 
@@ -273,6 +276,80 @@ Exemplo (imagem):
 
 - `messageId` é obrigatório; `zaapId` opcional.
 - Atualiza `updated_at` e invalida o cache.
+
+## WhatsApp (Z-API)
+
+Integração com a Z-API para envio de mensagens e mídias no WhatsApp. Todos os endpoints seguem o envelope padrão de sucesso/erro e exigem o header `X-API-Key`. Em caso de falha da Z-API, retornamos 502 (bad_gateway) com detalhes adicionais quando `APP_DEBUG=true`.
+
+### /v1/whatsapp/text
+
+| Método | Descrição | Auth | Body obrigatório |
+|--------|-----------|------|------------------|
+| POST   | Envia mensagem de texto para um número. | Sim  | `{ "phone": "DDD...", "message": "..." }` |
+
+Regras principais:
+- `phone`: somente dígitos, mínimo 10 e máximo 15 caracteres.
+- `message`: texto entre 1 e 4096 caracteres.
+
+**Exemplo**
+```bash
+curl -X POST "http://localhost:8080/v1/whatsapp/text"   -H "X-API-Key: $APP_API_KEY" -H "Content-Type: application/json"   -d '{"phone":"5548999999999","message":"Olá, mundo!"}'
+```
+
+### /v1/whatsapp/audio
+
+| Método | Descrição | Auth | Body obrigatório |
+|--------|-----------|------|------------------|
+| POST   | Envia áudio (link http(s) ou data URI `data:audio/...`) para um contato. | Sim | `{ "phone": "...", "audio": "https://..." }` |
+
+Campos opcionais: `delayMessage` (1–15), `delayTyping` (1–15), `viewOnce`, `async`, `waveform`.
+
+```bash
+curl -X POST "http://localhost:8080/v1/whatsapp/audio"   -H "X-API-Key: $APP_API_KEY" -H "Content-Type: application/json"   -d '{"phone":"5511999999999","audio":"https://dominio.com/exemplo.mp3","viewOnce":false}'
+```
+
+### /v1/whatsapp/image
+
+| Método | Descrição | Auth | Body obrigatório |
+|--------|-----------|------|------------------|
+| POST   | Envia imagem para o contato (URL http(s) ou `data:image/...`). | Sim | `{ "phone": "...", "image": "https://..." }` |
+
+Opcionais: `caption` (≤3000), `messageId`, `delayMessage`, `viewOnce`.
+
+```bash
+curl -X POST "http://localhost:8080/v1/whatsapp/image"   -H "X-API-Key: $APP_API_KEY" -H "Content-Type: application/json"   -d '{"phone":"5511999999999","image":"https://www.z-api.io/wp-content/themes/z-api/dist/images/logo.svg","caption":"Logo"}'
+```
+
+### /v1/whatsapp/document
+
+| Método | Descrição | Auth | Body obrigatório |
+|--------|-----------|------|------------------|
+| POST   | Envia documentos utilizando `send-document/{extension}` da Z-API. | Sim | `{ "phone": "...", "document": "https://...", "extension": "pdf" }` |
+
+Opcionais: `fileName`, `caption`, `messageId`, `delayMessage`, `editDocumentMessageId`.
+
+```bash
+curl -X POST "http://localhost:8080/v1/whatsapp/document"   -H "X-API-Key: $APP_API_KEY" -H "Content-Type: application/json"   -d '{"phone":"5544999999999","document":"https://expoforest.com.br/wp-content/uploads/2017/05/exemplo.pdf","extension":"pdf","fileName":"Meu PDF"}'
+```
+
+### /v1/whatsapp/status/image
+
+| Método | Descrição | Auth | Body obrigatório |
+|--------|-----------|------|------------------|
+| POST   | Publica imagem no status (expira em 24h). | Sim | `{ "image": "https://..." }` |
+
+`caption` é opcional (≤3000). Aceita data URI.
+
+### /v1/whatsapp/status/video
+
+| Método | Descrição | Auth | Body obrigatório |
+|--------|-----------|------|------------------|
+| POST   | Publica vídeo no status (limite máximo 10 MB). | Sim | `{ "video": "https://..." }` |
+
+`caption` opcional. Valide o tamanho do arquivo quando possível antes de enviar.
+
+> **Dica:** configure o webhook da Z-API para acompanhar respostas assíncronas quando usar `async=true` em `/v1/whatsapp/audio`.
+
 
 ## Banco de dados local
 

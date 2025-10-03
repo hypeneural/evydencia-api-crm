@@ -20,6 +20,12 @@ use App\Actions\ScheduledPosts\GetScheduledPostAction;
 use App\Actions\ScheduledPosts\ListScheduledPostsAction;
 use App\Actions\ScheduledPosts\MarkScheduledPostSentAction;
 use App\Actions\ScheduledPosts\UpdateScheduledPostAction;
+use App\Actions\WhatsApp\SendAudioAction;
+use App\Actions\WhatsApp\SendDocumentAction;
+use App\Actions\WhatsApp\SendImageAction;
+use App\Actions\WhatsApp\SendImageStatusAction;
+use App\Actions\WhatsApp\SendTextAction;
+use App\Actions\WhatsApp\SendVideoStatusAction;
 use Slim\App;
 use Slim\Routing\RouteCollectorProxy;
 
@@ -48,6 +54,15 @@ return function (App $app): void {
         $group->get('/orders/search', SearchOrdersAction::class);
         $group->get('/orders/{uuid}', GetOrderDetailAction::class);
         $group->put('/orders/{uuid}/status', UpdateOrderStatusAction::class);
+
+        $group->group('/whatsapp', function (RouteCollectorProxy $whatsapp): void {
+            $whatsapp->post('/text', SendTextAction::class);
+            $whatsapp->post('/audio', SendAudioAction::class);
+            $whatsapp->post('/image', SendImageAction::class);
+            $whatsapp->post('/document', SendDocumentAction::class);
+            $whatsapp->post('/status/image', SendImageStatusAction::class);
+            $whatsapp->post('/status/video', SendVideoStatusAction::class);
+        });
 
         $group->group('/reports', function (RouteCollectorProxy $reports): void {
             $reports->get('/sold-items', GetSoldItemsAction::class);

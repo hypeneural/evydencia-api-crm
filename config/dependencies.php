@@ -7,6 +7,7 @@ use App\Application\Services\CampaignService;
 use App\Application\Services\OrderService;
 use App\Application\Services\ReportService;
 use App\Application\Services\ScheduledPostService;
+use App\Application\Services\WhatsAppService;
 use App\Application\Support\ApiResponder;
 use App\Application\Support\QueryMapper;
 use App\Domain\Repositories\BlacklistRepositoryInterface;
@@ -15,6 +16,7 @@ use App\Domain\Repositories\ScheduledPostRepositoryInterface;
 use App\Infrastructure\Cache\RedisRateLimiter;
 use App\Infrastructure\Cache\ScheduledPostCache;
 use App\Infrastructure\Http\EvydenciaApiClient;
+use App\Infrastructure\Http\ZapiClient;
 use App\Infrastructure\Logging\LoggerFactory;
 use App\Infrastructure\Persistence\PdoBlacklistRepository;
 use App\Infrastructure\Persistence\PdoOrderRepository;
@@ -141,6 +143,24 @@ return static function (ContainerBuilder $containerBuilder): void {
                 $container->get(LoggerInterface::class)
             );
         },
+        ZapiClient::class => static function (ContainerInterface $container): ZapiClient {
+            $settings = $container->get(Settings::class)->getZapi();
+
+            $baseUrl = $settings['base_url'] ?? 'https://api.z-api.io';
+            $instance = $settings['instance'] ?? '';
+            $token = $settings['token'] ?? '';
+            $clientToken = $settings['client_token'] ?? '';
+            $timeout = isset($settings['timeout']) ? (float) $settings['timeout'] : 30.0;
+
+            return new ZapiClient(
+                $baseUrl,
+                $instance,
+                $token,
+                $clientToken,
+                $timeout,
+                $container->get(LoggerInterface::class)
+            );
+        },
         BlacklistService::class => static function (ContainerInterface $container): BlacklistService {
             return new BlacklistService(
                 $container->get(BlacklistRepositoryInterface::class),
@@ -153,6 +173,17 @@ return static function (ContainerBuilder $containerBuilder): void {
                 $container->get(ScheduledPostRepositoryInterface::class),
                 $container->get(ScheduledPostCache::class),
                 $container->get(LoggerInterface::class)
+            );
+        },
+        WhatsAppService::class => static function (ContainerInterface $container): WhatsAppService {
+            $settings = $container->get(Settings::class);
+            $app = $settings->getApp();
+            $debug = (bool) ($app['debug'] ?? false);
+
+            return new WhatsAppService(
+                $container->get(ZapiClient::class),
+                $container->get(LoggerInterface::class),
+                $debug
             );
         },
         ReportService::class => static function (ContainerInterface $container): ReportService {

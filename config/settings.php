@@ -47,6 +47,13 @@ return [
         'token' => $_ENV['CRM_TOKEN'] ?? '',
         'timeout' => isset($_ENV['CRM_TIMEOUT']) ? (float) $_ENV['CRM_TIMEOUT'] : 30.0,
     ],
+    'zapi' => [
+        'base_url' => rtrim($_ENV['ZAPI_BASE_URL'] ?? 'https://api.z-api.io', '/'),
+        'instance' => $_ENV['ZAPI_INSTANCE'] ?? '',
+        'token' => $_ENV['ZAPI_TOKEN'] ?? '',
+        'client_token' => $_ENV['ZAPI_CLIENT_TOKEN'] ?? '',
+        'timeout' => isset($_ENV['ZAPI_TIMEOUT']) ? (float) $_ENV['ZAPI_TIMEOUT'] : 30.0,
+    ],
     'cors' => [
         'allowed_origins' => array_filter(array_map('trim', explode(',', $_ENV['CORS_ALLOWED_ORIGINS'] ?? '*'))),
         'allowed_methods' => array_filter(array_map('trim', explode(',', $_ENV['CORS_ALLOWED_METHODS'] ?? 'GET,POST,PUT,PATCH,DELETE,OPTIONS'))),
@@ -56,4 +63,5 @@ return [
         'max_age' => (int) ($_ENV['CORS_MAX_AGE'] ?? 86400),
     ],
 ];
+
 

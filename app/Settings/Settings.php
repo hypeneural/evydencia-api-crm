@@ -80,6 +80,14 @@ final class Settings
         return $this->get('cors', []);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    public function getZapi(): array
+    {
+        return $this->get('zapi', []);
+    }
+
     public function getApiKey(): ?string
     {
         $app = $this->getApp();
