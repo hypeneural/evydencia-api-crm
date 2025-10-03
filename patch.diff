@@ -1,0 +1,55 @@
+*** Begin Patch
+*** Update File: app/Application/Support/QueryMapper.php
+@@
+-    private const ORDER_EQUAL_FILTERS = [
+-        'uuid' => 'order[uuid]',
+-        'status' => 'order[status]',
+-        'customer_id' => 'customer[id]',
+-        'customer_uuid' => 'customer[uuid]',
+-        'customer_email' => 'customer[email]',
+-        'customer_whatsapp' => 'customer[whatsapp]',
+-        'product_uuid' => 'product[uuid]',
+-        'product_name' => 'product[name]',
+-        'product_slug' => 'product[slug]',
+-        'product_ref' => 'product[reference]',
+-    ];
++    private const ORDER_EQUAL_FILTERS = [
++        'uuid' => 'order[uuid]',
++        'order_id' => 'order[id]',
++        'status' => 'order[status]',
++        'customer_id' => 'customer[id]',
++        'customer_uuid' => 'customer[uuid]',
++        'customer_email' => 'customer[email]',
++        'customer_document' => 'customer[document]',
++        'customer_whatsapp' => 'customer[whatsapp]',
++        'customer_phone' => 'customer[phone]',
++        'product_uuid' => 'product[uuid]',
++        'product_name' => 'product[name]',
++        'product_slug' => 'product[slug]',
++        'product_ref' => 'product[reference]',
++    ];
+@@
+-    private const ORDER_TOP_LEVEL_EQUAL = [
+-        'status' => 'order[status]',
+-        'customer_uuid' => 'customer[uuid]',
+-        'customer_email' => 'customer[email]',
+-        'customer_whatsapp' => 'customer[whatsapp]',
+-        'product_uuid' => 'product[uuid]',
+-        'product_name' => 'product[name]',
+-        'product_slug' => 'product[slug]',
+-        'product_ref' => 'product[reference]',
+-    ];
++    private const ORDER_TOP_LEVEL_EQUAL = [
++        'status' => 'order[status]',
++        'order_id' => 'order[id]',
++        'customer_uuid' => 'customer[uuid]',
++        'customer_email' => 'customer[email]',
++        'customer_document' => 'customer[document]',
++        'customer_whatsapp' => 'customer[whatsapp]',
++        'customer_phone' => 'customer[phone]',
++        'product_uuid' => 'product[uuid]',
++        'product_name' => 'product[name]',
++        'product_slug' => 'product[slug]',
++        'product_ref' => 'product[reference]',
++    ];
+*** End Patch

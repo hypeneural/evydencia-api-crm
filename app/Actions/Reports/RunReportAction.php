@@ -5,20 +5,16 @@ declare(strict_types=1);
 namespace App\Actions\Reports;
 
 use App\Application\Services\ReportEngine;
+use App\Application\Reports\ReportResult;
 use App\Application\Support\ApiResponder;
 use App\Domain\Exception\CrmRequestException;
 use App\Domain\Exception\CrmUnavailableException;
 use App\Domain\Exception\ValidationException;
+use GuzzleHttp\Psr7\Utils;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Log\LoggerInterface;
 
-/**
- * Executa um relat?rio a partir da chave declarada no motor.
- *
- * Exemplo:
- *   curl -H "X-API-Key: <key>" "http://api.local/v1/reports/orders.missing_schedule?product[slug]=natal&per_page=50"
- */
 final class RunReportAction
 {
     public function __construct(
@@ -59,9 +55,9 @@ final class RunReportAction
                 sprintf('Erro ao consultar CRM (status %d).', $exception->getStatusCode())
             )->withHeader('X-Request-Id', $traceId);
         } catch (\Throwable $exception) {
-            $this->logger->error('report_engine.run.error', [
+            $this->logger->error('report.run.error', [
                 'trace_id' => $traceId,
-                'key' => $key,
+                'report_key' => $key,
                 'error' => $exception->getMessage(),
             ]);
 
@@ -69,20 +65,41 @@ final class RunReportAction
                 ->withHeader('X-Request-Id', $traceId);
         }
 
-        $meta = $result->meta;
-        if ($result->summary !== []) {
-            $meta['summary'] = $result->summary;
-        }
+        $payload = $this->buildPayload($result, $request, $traceId, $key);
+        $stream = Utils::streamFor(json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $cacheMeta = $result->meta['cache'] ?? [];
+        $cacheHeader = ($cacheMeta['hit'] ?? false) ? 'HIT' : 'MISS';
 
+        return $response
+            ->withBody($stream)
+            ->withHeader('Content-Type', 'application/json; charset=utf-8')
+            ->withHeader('X-Request-Id', $traceId)
+            ->withHeader('X-Cache', sprintf('%s; key=%s', $cacheHeader, $cacheMeta['key'] ?? ''))
+            ->withHeader('Cache-Control', 'no-store');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildPayload(ReportResult $result, Request $request, string $traceId, string $key): array
+    {
+        $meta = $result->meta;
+        $summary = $result->summary;
         $links = [
             'self' => (string) $request->getUri(),
-            'export' => (string) $request->getUri()->withPath($request->getUri()->getPath() . '/export'),
-            'prev' => null,
+            'export_csv' => (string) $request->getUri()->withPath($request->getUri()->getPath() . '/export')->withQuery('format=csv&' . $request->getUri()->getQuery()),
+            'export_json' => (string) $request->getUri()->withPath($request->getUri()->getPath() . '/export')->withQuery('format=json&' . $request->getUri()->getQuery()),
         ];
-        $links['next'] = null;
 
-        return $this->responder->successList($response, $result->data, $meta, $links, $traceId)
-            ->withHeader('X-Request-Id', $traceId);
+        return [
+            'success' => true,
+            'data' => $result->data,
+            'summary' => $summary,
+            'meta' => $meta,
+            'columns' => $result->columns,
+            'links' => $links,
+            'trace_id' => $traceId,
+        ];
     }
 
     private function resolveTraceId(Request $request): string

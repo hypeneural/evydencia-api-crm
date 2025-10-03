@@ -10,30 +10,22 @@ interface ReportInterface
 
     public function title(): string;
 
-    /**
-     * @return array<string, \Respect\Validation\Validatable>
-     */
-    public function rules(): array;
+    public function description(): string;
 
     /**
-     * @return array<string, mixed>
+     * @return array<string, array<string, mixed>>
      */
-    public function defaultFilters(): array;
+    public function params(): array;
 
     /**
-     * @return array<int, string>
+     * @return array<int, array<string, mixed>>
      */
     public function columns(): array;
 
     /**
-     * @return array<int, string>
+     * @param array<string, mixed> $input
      */
-    public function sortable(): array;
-
-    /**
-     * @param array<string, mixed> $filters
-     */
-    public function run(array $filters): ReportResult;
+    public function run(array $input): ReportResult;
 
     public function cacheTtl(): int;
 }

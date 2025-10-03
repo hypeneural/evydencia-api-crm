@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Services;
 
-use App\Application\Reports\BaseReport;
+use App\Application\Reports\ReportHelpers;
 use App\Application\Reports\ReportInterface;
 use App\Application\Reports\ReportResult;
 use App\Application\Support\QueryMapper;
@@ -13,20 +13,45 @@ use App\Infrastructure\Http\EvydenciaApiClient;
 use Closure;
 use GuzzleHttp\Psr7\PumpStream;
 use GuzzleHttp\Psr7\Utils;
+use PDO;
 use Predis\Client as PredisClient;
 use Predis\Exception\PredisException;
 use Psr\Http\Message\StreamInterface;
 use Psr\Log\LoggerInterface;
-use ReflectionFunction;
 use Respect\Validation\Exceptions\NestedValidationException;
 use Respect\Validation\Validatable;
+use Respect\Validation\Validator as v;
 use RuntimeException;
 
 final class ReportEngine
 {
+    private const DEFAULT_TTL = 900;
     private const DEFAULT_PAGE = 1;
     private const DEFAULT_PER_PAGE = 50;
-    private const MAX_PER_PAGE = 100;
+    private const MAX_PER_PAGE = 500;
+
+    private const CRM_FILTER_WHITELIST = [
+        'order[uuid]',
+        'order[status]',
+        'order[created-start]',
+        'order[created-end]',
+        'order[session-start]',
+        'order[session-end]',
+        'order[selection-start]',
+        'order[selection-end]',
+        'customer[id]',
+        'customer[uuid]',
+        'customer[name]',
+        'customer[email]',
+        'customer[whatsapp]',
+        'customer[document]',
+        'product[uuid]',
+        'product[name]',
+        'product[slug]',
+        'product[reference]',
+        'include',
+        'fields',
+    ];
 
     /**
      * @var array<string, array<string, mixed>>
@@ -38,14 +63,18 @@ final class ReportEngine
      */
     private array $instances = [];
 
+    private ReportHelpers $helpers;
+
     public function __construct(
-        private readonly EvydenciaApiClient $apiClient,
+        private readonly EvydenciaApiClient $crm,
         private readonly QueryMapper $queryMapper,
         private readonly ?PredisClient $redis,
         private readonly LoggerInterface $logger,
+        private readonly ?PDO $pdo,
         private readonly string $definitionsPath
     ) {
         $this->definitions = $this->loadDefinitions($definitionsPath);
+        $this->helpers = new ReportHelpers();
     }
 
     /**
@@ -54,21 +83,19 @@ final class ReportEngine
     public function list(): array
     {
         $items = [];
-
         foreach ($this->definitions as $key => $definition) {
-            $report = ($definition['type'] ?? null) === 'class'
-                ? $this->resolveReport($key)
-                : null;
-
-            $title = $definition['title'] ?? ($report?->title() ?? $key);
-            $columns = $this->resolveColumns($definition, $report);
-            $sortable = $this->resolveSortable($definition, $report);
+            $report = $this->resolveReportInstance($key, $definition);
+            $columns = $definition['columns'] ?? [];
+            if ($report instanceof ReportInterface) {
+                $columns = $report->columns();
+            }
 
             $items[] = [
                 'key' => $key,
-                'title' => $title,
+                'title' => $definition['title'] ?? ($report?->title() ?? $key),
+                'description' => $definition['description'] ?? ($report?->description() ?? ''),
                 'columns' => $columns,
-                'sortable' => $sortable,
+                'params' => $definition['params'] ?? ($report?->params() ?? []),
             ];
         }
 
@@ -81,92 +108,94 @@ final class ReportEngine
     public function run(string $key, array $query, string $traceId): ReportResult
     {
         $definition = $this->getDefinition($key);
-        $report = ($definition['type'] ?? null) === 'class'
-            ? $this->resolveReport($key)
-            : null;
+        $report = $this->resolveReportInstance($key, $definition);
+        $schema = $this->resolveParamsSchema($definition, $report);
+        $columnsMeta = $this->resolveColumnsMeta($definition, $report);
+        $description = $definition['description'] ?? ($report?->description() ?? '');
 
-        $rules = $this->resolveRules($definition, $report);
-        $defaults = $this->resolveDefaults($definition, $report);
-        $columns = $this->resolveColumns($definition, $report);
-        $sortable = $this->resolveSortable($definition, $report);
-
-        $errors = $this->validateQuery($query, $rules);
+        [$input, $errors] = $this->normalizeParams($schema, $query);
         if ($errors !== []) {
             throw new ValidationException($errors);
         }
 
-        $page = $this->normalizePage($query['page'] ?? null);
-        $perPage = $this->normalizePerPage($query['per_page'] ?? null);
-        $sort = $this->normalizeSort($query['sort'] ?? null, $query['dir'] ?? null, $sortable);
-        $cacheEnabled = $this->isCacheEnabled($query);
-        $ttlOverride = $this->parseCacheTtlOverride($query['cache_ttl'] ?? null);
+        $page = (int) ($input['page'] ?? self::DEFAULT_PAGE);
+        $perPage = (int) ($input['per_page'] ?? self::DEFAULT_PER_PAGE);
+        $sort = $input['sort'] ?? null;
+        $dir = $input['dir'] ?? 'asc';
+        $cacheEnabled = (bool) ($input['_cache_enabled'] ?? true);
+        $cacheTtlOverride = $input['_cache_ttl'] ?? null;
+        $fetchAll = ($input['_fetch_all'] ?? false) === true;
+        unset($input['_cache_enabled'], $input['_cache_ttl'], $input['_fetch_all']);
 
-        $filters = $this->applyDefaults($defaults, $query);
-        $filters['page'] = $page;
-        $filters['per_page'] = $perPage;
-        if ($sort['field'] !== null) {
-            $filters['sort'] = $sort['field'];
-            $filters['dir'] = $sort['direction'];
+        $cacheKey = $this->makeCacheKey($key, $this->cacheRelevantQuery($input, $page, $perPage));
+        $ttl = $this->resolveTtl($definition, $report, $cacheTtlOverride);
+
+        $cacheData = null;
+        if ($cacheEnabled && $ttl > 0 && $this->redis !== null) {
+            try {
+                $cached = $this->redis->get($cacheKey);
+            } catch (PredisException) {
+                $cached = null;
+            }
+            if (is_string($cached) && $cached !== '') {
+                $payload = json_decode($cached, true);
+                if (is_array($payload) && isset($payload['data'], $payload['summary'], $payload['meta'], $payload['columns'])) {
+                    $meta = $payload['meta'];
+                    $meta['cache'] = ['hit' => true, 'key' => $cacheKey];
+                    $meta['description'] = $description;
+                    return new ReportResult($payload['data'], $payload['summary'], $meta, $payload['columns']);
+                }
+            }
         }
 
         $startedAt = microtime(true);
-        $this->logger->info('report_engine.run.start', [
-            'key' => $key,
+        $this->logger->info('report.run.start', [
+            'report_key' => $key,
             'trace_id' => $traceId,
+            'params' => array_keys($input),
             'page' => $page,
             'per_page' => $perPage,
-            'sort' => $sort['field'],
-            'dir' => $sort['direction'],
-            'cache_enabled' => $cacheEnabled,
         ]);
 
-        $cacheHit = false;
-        if ($report instanceof BaseReport) {
-            $filters['_trace_id'] = $traceId;
-            if (!$cacheEnabled) {
-                $filters['_cache_disabled'] = true;
-            } elseif ($ttlOverride !== null) {
-                $filters['_cache_ttl_override'] = $ttlOverride;
-            }
+        $input['trace_id'] = $traceId;
+        $input['page'] = $page;
+        $input['per_page'] = $perPage;
+        $input['sort'] = $sort;
+        $input['dir'] = $dir;
+        $input['fetch'] = $fetchAll ? 'all' : 'page';
 
-            $result = $report->run($filters);
-            $cacheHit = (bool) ($result->meta['cache_hit'] ?? false);
-        } else {
-            $result = $this->runClosureReport(
-                $key,
-                $definition,
-                $filters,
-                $traceId,
-                $columns,
-                $cacheEnabled,
-                $ttlOverride,
-                $cacheHit
-            );
-        }
-
-        if ($result->columns === []) {
-            $result->columns = $columns;
-        }
-
+        $result = $this->executeReport($definition, $report, $input, $traceId, $columnsMeta);
+        $result->meta['cache'] = ['hit' => false, 'key' => $cacheKey];
         $result->meta['page'] = $result->meta['page'] ?? $page;
         $result->meta['per_page'] = $result->meta['per_page'] ?? $perPage;
-        $result->meta['count'] = $result->meta['count'] ?? count($result->data);
-        $result->meta['total'] = $result->meta['total'] ?? $result->meta['count'];
-        $result->meta['cache_hit'] = $result->meta['cache_hit'] ?? $cacheHit;
-        $result->meta['source'] = $result->meta['source'] ?? 'crm';
-        if (!isset($result->meta['sort']) && $sort['field'] !== null) {
-            $result->meta['sort'] = $sort;
+        $result->meta['sort'] = $sort;
+        $result->meta['dir'] = $dir;
+        $result->meta['description'] = $description;
+        $result->meta['trace_id'] = $traceId;
+        $result->meta['source'] = $result->meta['source'] ?? 'engine';
+
+        $elapsed = (int) round((microtime(true) - $startedAt) * 1000);
+        $result->meta['took_ms'] = $result->meta['took_ms'] ?? $elapsed;
+
+        if ($cacheEnabled && $ttl > 0 && $this->redis !== null) {
+            $payload = [
+                'data' => $result->data,
+                'summary' => $result->summary,
+                'meta' => $result->meta,
+                'columns' => $result->columns,
+            ];
+            try {
+                $this->redis->setex($cacheKey, $ttl, json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+            } catch (PredisException) {
+                // ignore cache failures
+            }
         }
 
-        $tookMs = (int) round((microtime(true) - $startedAt) * 1000);
-        $result->meta['took_ms'] = $result->meta['took_ms'] ?? $tookMs;
-
-        $this->logger->info('report_engine.run.finish', [
-            'key' => $key,
+        $this->logger->info('report.run.finish', [
+            'report_key' => $key,
             'trace_id' => $traceId,
-            'took_ms' => $tookMs,
-            'cache_hit' => $result->meta['cache_hit'],
-            'total' => $result->meta['total'],
+            'took_ms' => $elapsed,
+            'total' => $result->meta['total'] ?? count($result->data),
         ]);
 
         return $result;
@@ -178,28 +207,18 @@ final class ReportEngine
     public function export(string $key, array $query, string $format, string $traceId): StreamInterface
     {
         $format = strtolower($format);
-        if (!in_array($format, ['csv', 'json'], true)) {
-            throw new ValidationException([[ 'field' => 'format', 'message' => 'Formato invalido. Use csv ou json.' ]]);
+        if (!in_array($format, ['csv', 'json', 'ndjson'], true)) {
+            throw new ValidationException([[ 'field' => 'format', 'message' => 'Formato invalido. Use csv, json ou ndjson.' ]]);
         }
 
-        if (!isset($query['per_page'])) {
-            $query['per_page'] = 100;
-        }
-
+        $query['fetch'] = 'all';
         $result = $this->run($key, $query, $traceId);
 
-        if ($format === 'json') {
-            $encoded = json_encode($result->data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-            if ($encoded === false) {
-                throw new RuntimeException('Falha ao gerar JSON do relatorio.');
-            }
-
-            return Utils::streamFor($encoded);
-        }
-
-        $columns = $result->columns !== [] ? $result->columns : $this->inferColumns($result->data);
-
-        return $this->createCsvStream($columns, $result->data);
+        return match ($format) {
+            'csv' => $this->exportCsv($result),
+            'ndjson' => $this->exportNdJson($result),
+            default => Utils::streamFor(json_encode($result->data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)),
+        };
     }
 
     /**
@@ -213,7 +232,7 @@ final class ReportEngine
 
         $definitions = require $path;
         if (!is_array($definitions)) {
-            throw new RuntimeException('Arquivo de definicoes de relatorio invalido.');
+            throw new RuntimeException('Invalid report definitions file.');
         }
 
         return $definitions;
@@ -231,20 +250,25 @@ final class ReportEngine
         return $this->definitions[$key];
     }
 
-    private function resolveReport(string $key): ReportInterface
+    /**
+     * @param array<string, mixed> $definition
+     */
+    private function resolveReportInstance(string $key, array $definition): ?ReportInterface
     {
+        if (($definition['type'] ?? null) !== 'class') {
+            return null;
+        }
+
         if (isset($this->instances[$key])) {
             return $this->instances[$key];
         }
 
-        $definition = $this->getDefinition($key);
         $className = $definition['class'] ?? null;
-
         if (!is_string($className) || !class_exists($className)) {
-            throw new RuntimeException(sprintf('Classe de relatorio invalida para %s.', $key));
+            throw new RuntimeException(sprintf('Classe invalida para relatorio %s.', $key));
         }
 
-        $instance = new $className($this->apiClient, $this->queryMapper, $this->redis, $this->logger);
+        $instance = new $className($this->crm, $this->pdo, $this->redis, $this->logger);
         if (!$instance instanceof ReportInterface) {
             throw new RuntimeException(sprintf('Relatorio %s deve implementar ReportInterface.', $key));
         }
@@ -253,354 +277,288 @@ final class ReportEngine
     }
 
     /**
-     * @return array<string, Validatable>
+     * @param array<string, mixed> $definition
+     * @return array<string, array<string, mixed>>
      */
-    private function resolveRules(array $definition, ?ReportInterface $report): array
+    private function resolveParamsSchema(array $definition, ?ReportInterface $report): array
     {
         if ($report !== null) {
-            return $report->rules();
+            return $report->params();
         }
 
-        $rules = $definition['rules'] ?? [];
-
-        return is_array($rules) ? $rules : [];
+        return $definition['params'] ?? [];
     }
 
     /**
-     * @return array<string, mixed>
+     * @param array<string, mixed> $definition
+     * @return array<int, array<string, mixed>>
      */
-    private function resolveDefaults(array $definition, ?ReportInterface $report): array
-    {
-        if ($report !== null) {
-            return $report->defaultFilters();
-        }
-
-        $defaults = $definition['defaults'] ?? [];
-
-        return is_array($defaults) ? $defaults : [];
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function resolveColumns(array $definition, ?ReportInterface $report): array
+    private function resolveColumnsMeta(array $definition, ?ReportInterface $report): array
     {
         if ($report !== null) {
             return $report->columns();
         }
 
-        $columns = $definition['columns'] ?? [];
-
-        return is_array($columns) ? array_values($columns) : [];
+        return $definition['columns'] ?? [];
     }
 
     /**
-     * @return array<int, string>
-     */
-    private function resolveSortable(array $definition, ?ReportInterface $report): array
-    {
-        if ($report !== null) {
-            return $report->sortable();
-        }
-
-        $sortable = $definition['sortable'] ?? [];
-
-        return is_array($sortable) ? array_values($sortable) : [];
-    }
-
-    /**
+     * @param array<string, mixed> $schema
      * @param array<string, mixed> $query
-     * @param array<string, Validatable> $rules
-     * @return array<int, array<string, string>>
+     * @return array{0: array<string, mixed>, 1: array<int, array<string, string>>}
      */
-    private function validateQuery(array $query, array $rules): array
+    private function normalizeParams(array $schema, array $query): array
     {
         $errors = [];
+        $resolved = [];
 
-        foreach ($rules as $field => $rule) {
-            if (!$rule instanceof Validatable) {
+        foreach ($schema as $name => $definition) {
+            $type = $definition['type'] ?? 'string';
+            $default = $definition['default'] ?? null;
+            $required = (bool) ($definition['required'] ?? false);
+            $enum = $definition['enum'] ?? null;
+
+            $value = $query[$name] ?? null;
+            if ($value === null && $default !== null) {
+                $value = is_callable($default) ? $default() : $default;
+            }
+
+            if ($required && ($value === null || $value === '')) {
+                $errors[] = ['field' => $name, 'message' => 'Parametro obrigatorio.'];
                 continue;
             }
 
-            $value = $query[$field] ?? null;
+            if ($value === null || $value === '') {
+                continue;
+            }
+
             try {
-                $rule->assert($value);
-            } catch (NestedValidationException $exception) {
-                $errors[] = [
-                    'field' => $field,
-                    'message' => $exception->getMessages()[0] ?? 'Valor invalido.',
-                ];
+                $resolved[$name] = $this->castValue($name, $value, $type, $definition);
+            } catch (InvalidParameterException $exception) {
+                $errors[] = ['field' => $name, 'message' => $exception->getMessage()];
+                continue;
+            }
+
+            if (is_array($enum) && !in_array($resolved[$name], $enum, true)) {
+                $errors[] = ['field' => $name, 'message' => 'Valor nao permitido.'];
             }
         }
-
-        if (isset($query['page']) && (!is_numeric($query['page']) || (int) $query['page'] < 1)) {
-            $errors[] = ['field' => 'page', 'message' => 'page deve ser >= 1'];
-        }
-
-        if (isset($query['per_page']) && (!is_numeric($query['per_page']) || (int) $query['per_page'] < 1 || (int) $query['per_page'] > self::MAX_PER_PAGE)) {
-            $errors[] = ['field' => 'per_page', 'message' => 'per_page deve estar entre 1 e 100'];
-        }
-
-        if (isset($query['dir']) && !in_array(strtolower((string) $query['dir']), ['asc', 'desc'], true)) {
-            $errors[] = ['field' => 'dir', 'message' => 'dir deve ser asc ou desc'];
-        }
-
-        if (isset($query['cache']) && !in_array(strtolower((string) $query['cache']), ['0', '1', 'true', 'false'], true)) {
-            $errors[] = ['field' => 'cache', 'message' => 'cache deve ser 0 ou 1'];
-        }
-
-        if (isset($query['cache_ttl']) && !is_numeric($query['cache_ttl'])) {
-            $errors[] = ['field' => 'cache_ttl', 'message' => 'cache_ttl deve ser numerico'];
-        }
-
-        return $errors;
-    }
-
-    private function normalizePage(mixed $value): int
-    {
-        $page = (int) ($value ?? self::DEFAULT_PAGE);
-
-        return max(1, $page);
-    }
-
-    private function normalizePerPage(mixed $value): int
-    {
-        $perPage = (int) ($value ?? self::DEFAULT_PER_PAGE);
-        if ($perPage < 1) {
-            $perPage = self::DEFAULT_PER_PAGE;
-        }
-
-        return min(self::MAX_PER_PAGE, $perPage);
-    }
-
-    /**
-     * @param array<int, string> $sortable
-     * @return array{field: string|null, direction: string}
-     */
-    private function normalizeSort(mixed $field, mixed $direction, array $sortable): array
-    {
-        if (!is_string($field) || $field === '' || !in_array($field, $sortable, true)) {
-            return ['field' => null, 'direction' => 'asc'];
-        }
-
-        $dir = is_string($direction) && strtolower($direction) === 'desc' ? 'desc' : 'asc';
-
-        return ['field' => $field, 'direction' => $dir];
-    }
-
-    /**
-     * @param array<string, mixed> $defaults
-     * @param array<string, mixed> $query
-     * @return array<string, mixed>
-     */
-    private function applyDefaults(array $defaults, array $query): array
-    {
-        $filters = $defaults;
 
         foreach ($query as $key => $value) {
-            if (in_array($key, ['page', 'per_page', 'sort', 'dir', 'cache', 'cache_ttl'], true)) {
+            if (isset($resolved[$key]) || isset($schema[$key])) {
                 continue;
             }
 
-            $filters[$key] = $value;
+            if (in_array($key, self::CRM_FILTER_WHITELIST, true)) {
+                if (is_array($value)) {
+                    $resolved[$key] = array_map(static fn ($item) => is_scalar($item) ? (string) $item : $item, $value);
+                } else {
+                    $resolved[$key] = is_scalar($value) ? (string) $value : $value;
+                }
+            }
         }
 
-        return $filters;
+        $resolved['page'] = $this->normalizePositiveInt($query['page'] ?? null, self::DEFAULT_PAGE);
+        $resolved['per_page'] = min(self::MAX_PER_PAGE, $this->normalizePositiveInt($query['per_page'] ?? null, self::DEFAULT_PER_PAGE));
+        $resolved['sort'] = is_string($query['sort'] ?? null) ? trim((string) $query['sort']) : null;
+        $resolved['dir'] = in_array(strtolower((string) ($query['dir'] ?? 'asc')), ['asc', 'desc'], true)
+            ? strtolower((string) ($query['dir'] ?? 'asc'))
+            : 'asc';
+        $resolved['_cache_enabled'] = !in_array(strtolower((string) ($query['cache'] ?? '1')), ['0', 'false'], true);
+        $resolved['_cache_ttl'] = isset($query['cache_ttl']) && is_numeric($query['cache_ttl'])
+            ? (int) $query['cache_ttl']
+            : null;
+        $resolved['_fetch_all'] = isset($query['fetch']) && strtolower((string) $query['fetch']) === 'all';
+
+        return [$resolved, $errors];
     }
 
-    private function isCacheEnabled(array $query): bool
-    {
-        if (!isset($query['cache'])) {
-            return true;
-        }
-
-        $value = strtolower((string) $query['cache']);
-
-        return !in_array($value, ['0', 'false'], true);
-    }
-
-    private function parseCacheTtlOverride(mixed $value): ?int
+    private function normalizePositiveInt(mixed $value, int $default): int
     {
         if (!is_numeric($value)) {
-            return null;
+            return $default;
         }
 
-        $ttl = (int) $value;
+        $int = (int) $value;
 
-        return $ttl < 0 ? 0 : $ttl;
+        return $int > 0 ? $int : $default;
+    }
+
+    private function castValue(string $name, mixed $value, string $type, array $definition): mixed
+    {
+        return match ($type) {
+            'int' => filter_var($value, FILTER_VALIDATE_INT) !== false ? (int) $value : throw new InvalidParameterException('Deve ser inteiro.'),
+            'float' => filter_var($value, FILTER_VALIDATE_FLOAT) !== false ? (float) $value : throw new InvalidParameterException('Deve ser numerico.'),
+            'bool' => $this->castBool($value),
+            'date' => $this->castDate($value, $definition['format'] ?? 'Y-m-d'),
+            'array<string>' => $this->castArrayString($value),
+            default => is_scalar($value) ? trim((string) $value) : throw new InvalidParameterException('Valor invalido.'),
+        };
+    }
+
+    private function castBool(mixed $value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        $normalized = strtolower((string) $value);
+
+        return in_array($normalized, ['1', 'true', 'yes', 'on'], true);
+    }
+
+    private function castDate(mixed $value, string $format): string
+    {
+        if (!is_string($value) || trim($value) === '') {
+            throw new InvalidParameterException('Data invalida.');
+        }
+
+        $validator = v::date($format);
+        try {
+            $validator->assert($value);
+        } catch (NestedValidationException $exception) {
+            throw new InvalidParameterException($exception->getMessage());
+        }
+
+        return $value;
     }
 
     /**
-     * @param array<int, mixed> $data
      * @return array<int, string>
      */
-    private function inferColumns(array $data): array
+    private function castArrayString(mixed $value): array
     {
-        if ($data === []) {
-            return [];
+        if (is_string($value)) {
+            return array_values(array_filter(array_map('trim', explode(',', $value)), static fn ($item) => $item !== ''));
         }
 
-        $first = $data[0];
-        if (!is_array($first)) {
-            return ['value'];
+        if (is_array($value)) {
+            $list = [];
+            foreach ($value as $item) {
+                if (is_scalar($item)) {
+                    $trim = trim((string) $item);
+                    if ($trim !== '') {
+                        $list[] = $trim;
+                    }
+                }
+            }
+
+            return $list;
         }
 
-        return array_keys($first);
+        throw new InvalidParameterException('Deve ser lista de strings.');
     }
 
-    private function makeCacheKey(string $key, array $filters): string
+    private function resolveTtl(array $definition, ?ReportInterface $report, ?int $override): int
     {
-        ksort($filters);
+        if ($override !== null) {
+            return max(0, $override);
+        }
 
-        return sprintf('evyapi:report:%s:%s', $key, sha1((string) json_encode($filters, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)));
+        if ($report !== null) {
+            return max(0, $report->cacheTtl());
+        }
+
+        if (isset($definition['cache'])) {
+            return max(0, (int) $definition['cache']);
+        }
+
+        return self::DEFAULT_TTL;
     }
 
     /**
      * @param array<string, mixed> $definition
-     * @param array<string, mixed> $filters
+     * @param array<string, mixed> $input
      */
-    private function runClosureReport(
-        string $key,
-        array $definition,
-        array $filters,
-        string $traceId,
-        array $columns,
-        bool $cacheEnabled,
-        ?int $ttlOverride,
-        bool &$cacheHit
-    ): ReportResult {
-        if (!isset($definition['runner']) || !is_callable($definition['runner'])) {
-            throw new RuntimeException(sprintf('Runner nao configurado para %s.', $key));
-        }
-
-        $runner = $definition['runner'];
-        $ttl = isset($definition['cache']) ? (int) $definition['cache'] : 0;
-        if ($ttlOverride !== null) {
-            $ttl = $ttlOverride;
-        }
-
-        if ($cacheEnabled && $ttl > 0 && $this->redis !== null) {
-            $cacheKey = $this->makeCacheKey($key, $filters);
-
-            try {
-                $cached = $this->redis->get($cacheKey);
-            } catch (PredisException) {
-                $cached = null;
+    private function executeReport(array $definition, ?ReportInterface $report, array $input, string $traceId, array $columnsMeta): ReportResult
+    {
+        if (($definition['type'] ?? null) === 'closure') {
+            $runner = $definition['runner'] ?? null;
+            if (!is_callable($runner)) {
+                throw new RuntimeException('Runner nao configurado para relatorio closure.');
             }
 
-            if (is_string($cached) && $cached !== '') {
-                $payload = json_decode($cached, true);
-                if (is_array($payload) && isset($payload['data'], $payload['summary'], $payload['meta'], $payload['columns'])) {
-                    $cacheHit = true;
-
-                    return new ReportResult(
-                        $payload['data'],
-                        $payload['summary'],
-                        $payload['meta'] + ['cache_hit' => true],
-                        $payload['columns']
-                    );
-                }
+            /** @var callable $runner */
+            $result = $runner($this->crm, $this->pdo, $input, $this->helpers);
+            if (!$result instanceof ReportResult) {
+                throw new RuntimeException('Runner deve retornar ReportResult.');
             }
 
-            $result = $this->invokeRunner($runner, $filters, $traceId);
-            $result->meta['cache_hit'] = $result->meta['cache_hit'] ?? false;
-
-            $payload = [
-                'data' => $result->data,
-                'summary' => $result->summary,
-                'meta' => $result->meta,
-                'columns' => $result->columns !== [] ? $result->columns : $columns,
-            ];
-
-            try {
-                $this->redis->setex($cacheKey, $ttl, json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-            } catch (PredisException) {
-                // ignore cache errors
+            if ($result->columns === []) {
+                $result->columns = $columnsMeta;
             }
 
             return $result;
         }
 
-        $result = $this->invokeRunner($runner, $filters, $traceId);
-        $result->meta['cache_hit'] = $result->meta['cache_hit'] ?? false;
+        if ($report === null) {
+            throw new RuntimeException('Relatorio nao configurado.');
+        }
+
+        $result = $report->run($input);
+        if ($result->columns === []) {
+            $result->columns = $report->columns();
+        }
 
         return $result;
     }
 
-    private function invokeRunner(callable $runner, array $filters, string $traceId): ReportResult
+    /**
+     * @return array<string, mixed>
+     */
+    private function cacheRelevantQuery(array $input, int $page, int $perPage): array
     {
-        $callable = Closure::fromCallable($runner);
-        $reflection = new ReflectionFunction($callable);
-        $parameterCount = $reflection->getNumberOfParameters();
+        $normalized = $input;
+        unset($normalized['trace_id']);
+        if (($normalized['fetch'] ?? null) !== 'all') {
+            $normalized['page'] = $page;
+            $normalized['per_page'] = $perPage;
+        }
 
-        return match (true) {
-            $parameterCount >= 3 => $callable($this->apiClient, $filters, $traceId),
-            $parameterCount === 2 => $callable($this->apiClient, $filters),
-            $parameterCount === 1 => $callable($filters),
-            default => $callable(),
-        };
+        return $normalized;
     }
 
-    /**
-     * @param array<int, string> $columns
-     * @param array<int, mixed> $rows
-     */
-    private function createCsvStream(array $columns, array $rows): StreamInterface
+    private function makeCacheKey(string $key, array $query): string
     {
+        ksort($query);
+
+        return sprintf('evyapi:report:%s:%s', $key, sha1((string) json_encode($query, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)));
+    }
+
+    private function exportCsv(ReportResult $result): StreamInterface
+    {
+        $columns = $result->columns;
+        if ($columns === []) {
+            $columns = $this->inferColumns($result->data);
+        }
+
+        $headers = array_map(static fn ($column) => $column['key'] ?? $column['label'] ?? (is_array($column) ? '' : $column), $columns);
+        $headerLine = $this->csvLine($headers);
+
         $index = 0;
-        $totalRows = count($rows);
         $buffer = '';
+        $total = count($result->data);
 
-        $generator = function () use (&$index, $columns, $rows, $totalRows) {
+        return new PumpStream(function ($length) use (&$index, &$buffer, $total, $result, $columns, $headerLine) {
             if ($index === 0) {
-                $values = $columns;
-            } else {
-                $rowIndex = $index - 1;
-                if ($rowIndex >= $totalRows) {
-                    return false;
-                }
+                $buffer .= $headerLine;
+                $index++;
+            }
 
-                $row = $rows[$rowIndex];
+            while (strlen($buffer) < $length && ($index - 1) < $total) {
+                $row = $result->data[$index - 1];
                 if (!is_array($row)) {
                     $row = ['value' => $row];
                 }
 
                 $values = [];
                 foreach ($columns as $column) {
-                    $value = $row[$column] ?? '';
-                    if (is_array($value) || is_object($value)) {
-                        $value = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                    }
-                    if ($value === null) {
-                        $value = '';
-                    }
-
-                    $values[] = (string) $value;
+                    $key = is_array($column) ? ($column['key'] ?? null) : $column;
+                    $values[] = $key !== null ? (string) ($row[$key] ?? '') : '';
                 }
-            }
 
-            $index++;
-
-            $handle = fopen('php://temp', 'r+');
-            if ($handle === false) {
-                return '';
-            }
-
-            fputcsv($handle, $values);
-            rewind($handle);
-            $line = stream_get_contents($handle) ?: '';
-            fclose($handle);
-
-            return $line;
-        };
-
-        return new PumpStream(function ($length) use (&$buffer, $generator) {
-            while (strlen($buffer) < $length) {
-                $chunk = $generator();
-                if ($chunk === false || $chunk === null) {
-                    break;
-                }
-                $buffer .= $chunk;
+                $buffer .= $this->csvLine($values);
+                $index++;
             }
 
             if ($buffer === '') {
@@ -613,4 +571,67 @@ final class ReportEngine
             return $slice;
         });
     }
+
+    private function exportNdJson(ReportResult $result): StreamInterface
+    {
+        $index = 0;
+        $total = count($result->data);
+        $buffer = '';
+
+        return new PumpStream(function ($length) use (&$index, $total, &$buffer, $result) {
+            while (strlen($buffer) < $length && $index < $total) {
+                $buffer .= json_encode($result->data[$index], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n";
+                $index++;
+            }
+
+            if ($buffer === '') {
+                return false;
+            }
+
+            $slice = substr($buffer, 0, $length);
+            $buffer = (string) substr($buffer, strlen($slice));
+
+            return $slice;
+        });
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function inferColumns(array $data): array
+    {
+        if ($data === []) {
+            return [];
+        }
+
+        $first = $data[0];
+        if (!is_array($first)) {
+            return [['key' => 'value', 'label' => 'Value', 'type' => 'string']];
+        }
+
+        $columns = [];
+        foreach (array_keys($first) as $key) {
+            $columns[] = ['key' => $key, 'label' => ucfirst(str_replace('_', ' ', $key)), 'type' => 'string'];
+        }
+
+        return $columns;
+    }
+
+    /**
+     * @param array<int, string> $values
+     */
+    private function csvLine(array $values): string
+    {
+        $handle = fopen('php://temp', 'r+');
+        fputcsv($handle, $values);
+        rewind($handle);
+        $line = stream_get_contents($handle) ?: '';
+        fclose($handle);
+
+        return $line;
+    }
+}
+
+final class InvalidParameterException extends RuntimeException
+{
 }

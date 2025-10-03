@@ -5,22 +5,14 @@ declare(strict_types=1);
 namespace App\Actions\Reports;
 
 use App\Application\Services\ReportEngine;
-use App\Application\Support\ApiResponder;
+use GuzzleHttp\Psr7\Utils;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 
-/**
- * Lista todos os relat?rios dispon?veis no motor.
- *
- * Exemplo:
- *   curl -H "X-API-Key: <key>" http://api.local/v1/reports
- */
 final class ListReportsAction
 {
-    public function __construct(
-        private readonly ReportEngine $engine,
-        private readonly ApiResponder $responder
-    ) {
+    public function __construct(private readonly ReportEngine $engine)
+    {
     }
 
     public function __invoke(Request $request, Response $response): Response
@@ -29,22 +21,31 @@ final class ListReportsAction
         $reports = $this->engine->list();
         $count = count($reports);
 
-        $meta = [
-            'page' => 1,
-            'per_page' => max(1, $count),
-            'count' => $count,
-            'total' => $count,
-            'source' => 'engine',
+        $payload = [
+            'success' => true,
+            'data' => $reports,
+            'summary' => ['count' => $count],
+            'meta' => [
+                'page' => 1,
+                'per_page' => $count > 0 ? $count : 1,
+                'total' => $count,
+                'took_ms' => 0,
+            ],
+            'links' => [
+                'self' => (string) $request->getUri(),
+                'export_csv' => null,
+                'export_json' => null,
+            ],
+            'trace_id' => $traceId,
         ];
 
-        $links = [
-            'self' => (string) $request->getUri(),
-            'next' => null,
-            'prev' => null,
-        ];
+        $stream = Utils::streamFor(json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 
-        return $this->responder->successList($response, $reports, $meta, $links, $traceId)
-            ->withHeader('X-Request-Id', $traceId);
+        return $response
+            ->withBody($stream)
+            ->withHeader('Content-Type', 'application/json; charset=utf-8')
+            ->withHeader('X-Request-Id', $traceId)
+            ->withHeader('Cache-Control', 'no-store');
     }
 
     private function resolveTraceId(Request $request): string

@@ -4,323 +4,142 @@ declare(strict_types=1);
 
 namespace App\Application\Reports;
 
-use App\Application\Support\QueryMapper;
 use App\Infrastructure\Http\EvydenciaApiClient;
+use PDO;
+use PDOException;
 use Predis\Client as PredisClient;
 use Predis\Exception\PredisException;
 use Psr\Log\LoggerInterface;
-use Respect\Validation\Validatable;
+use RuntimeException;
 
 abstract class BaseReport implements ReportInterface
 {
-    protected const DEFAULT_PAGE = 1;
-    protected const DEFAULT_PER_PAGE = 50;
-    protected const MAX_PER_PAGE = 100;
-    protected const CACHE_PREFIX = 'evyapi:report:';
-
-    /**
-     * @var array<string>
-     */
-    private const ALLOWED_FILTER_KEYS = [
-        'order[uuid]',
-        'order[status]',
-        'order[created-start]',
-        'order[created-end]',
-        'order[session-start]',
-        'order[session-end]',
-        'order[selection-start]',
-        'order[selection-end]',
-        'customer[id]',
-        'customer[uuid]',
-        'customer[name]',
-        'customer[email]',
-        'customer[whatsapp]',
-        'customer[document]',
-        'product[uuid]',
-        'product[name]',
-        'product[slug]',
-        'product[reference]',
-        'include',
-        'fields',
-        'page',
-        'per_page',
-        'sort',
-        'dir',
-    ];
+    protected ReportHelpers $helpers;
 
     public function __construct(
-        protected readonly EvydenciaApiClient $apiClient,
-        protected readonly QueryMapper $queryMapper,
+        protected readonly EvydenciaApiClient $crm,
+        protected readonly ?PDO $pdo,
         protected readonly ?PredisClient $redis,
         protected readonly LoggerInterface $logger
     ) {
-    }
-
-    final public function cacheKey(array $filters): string
-    {
-        ksort($filters);
-        return self::CACHE_PREFIX . $this->key() . ':' . sha1((string) json_encode($filters, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $this->helpers = new ReportHelpers();
     }
 
     /**
-     * @param array<string, mixed> $input
-     * @param array<string, mixed> $defaults
-     * @return array<string, mixed>
+     * @return array<int, mixed>
      */
-    protected function normalizeFilters(array $input, array $defaults = []): array
+    protected function fromArray(iterable $items): array
     {
-        $normalized = $defaults;
-
-        foreach ($input as $key => $value) {
-            if (!is_string($key) || $key === '') {
-                continue;
-            }
-
-            if (!in_array($key, self::ALLOWED_FILTER_KEYS, true) && !array_key_exists($key, $defaults)) {
-                continue;
-            }
-
-            if (is_array($value)) {
-                $normalized[$key] = array_filter($value, static fn ($item): bool => $item !== null && $item !== '');
-                continue;
-            }
-
-            if ($value === null) {
-                continue;
-            }
-
-            $scalarValue = is_scalar($value) ? trim((string) $value) : '';
-            if ($scalarValue === '') {
-                continue;
-            }
-
-            $normalized[$key] = $scalarValue;
-        }
-
-        return $normalized;
+        return is_array($items) ? $items : iterator_to_array($items, false);
     }
 
     /**
-     * @param array<string, mixed> $filters
-     * @return array{page: int, per_page: int}
+     * @param array<string, mixed> $query
+     * @return array<int, mixed>
      */
-    protected function resolvePagination(array $filters): array
+    protected function fetchCrm(string $endpoint, array $query, string $traceId, int $maxPages = 10): array
     {
-        $page = (int) ($filters['page'] ?? self::DEFAULT_PAGE);
-        $perPage = (int) ($filters['per_page'] ?? self::DEFAULT_PER_PAGE);
+        $page = 1;
+        $results = [];
+        $currentQuery = $query;
 
-        if ($page < 1) {
-            $page = self::DEFAULT_PAGE;
+        while ($page <= $maxPages) {
+            $response = $this->crm->get($endpoint, $currentQuery, $traceId);
+            $body = $response['body'] ?? [];
+            $data = isset($body['data']) && is_array($body['data']) ? $body['data'] : [];
+            $results = array_merge($results, $data);
+
+            $links = $body['links'] ?? [];
+            $next = is_array($links) ? ($links['next'] ?? null) : null;
+            if (!is_string($next) || $next === '') {
+                break;
+            }
+
+            $nextQuery = $this->extractQueryFromLink($next);
+            if ($nextQuery === null) {
+                break;
+            }
+
+            $currentQuery = array_merge($currentQuery, $nextQuery);
+            $page++;
         }
 
-        if ($perPage < 1) {
-            $perPage = self::DEFAULT_PER_PAGE;
-        }
-
-        if ($perPage > self::MAX_PER_PAGE) {
-            $perPage = self::MAX_PER_PAGE;
-        }
-
-        return ['page' => $page, 'per_page' => $perPage];
+        return $results;
     }
 
     /**
-     * @param array<int, array<string, mixed>> $data
+     * @param array<string, mixed> $query
+     * @return array<int, mixed>
+     */
+    protected function fetchOrders(array $query, string $traceId, int $maxPages = 10): array
+    {
+        $page = 1;
+        $results = [];
+        $currentQuery = $query;
+
+        while ($page <= $maxPages) {
+            $response = $this->crm->searchOrders($currentQuery, $traceId);
+            $body = $response['body'] ?? [];
+            $data = isset($body['data']) && is_array($body['data']) ? $body['data'] : [];
+            $results = array_merge($results, $data);
+
+            $links = $body['links'] ?? [];
+            $next = is_array($links) ? ($links['next'] ?? null) : null;
+            if (!is_string($next) || $next === '') {
+                break;
+            }
+
+            $nextQuery = $this->extractQueryFromLink($next);
+            if ($nextQuery === null) {
+                break;
+            }
+
+            $currentQuery = array_merge($currentQuery, $nextQuery);
+            $page++;
+        }
+
+        return $results;
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
-    protected function sortData(array $data, ?string $field, string $direction = 'asc'): array
+    protected function fetchMysql(string $sql, array $params = []): array
     {
-        if ($field === null || $field === '' || $data === []) {
-            return $data;
+        if ($this->pdo === null) {
+            throw new RuntimeException('MySQL connection is not configured.');
         }
 
-        $direction = strtolower($direction) === 'desc' ? 'desc' : 'asc';
-
-        usort($data, function (array $left, array $right) use ($field, $direction): int {
-            $leftValue = $left[$field] ?? null;
-            $rightValue = $right[$field] ?? null;
-
-            if ($leftValue === $rightValue) {
-                return 0;
+        try {
+            $statement = $this->pdo->prepare($sql);
+            foreach ($params as $key => $value) {
+                $statement->bindValue(is_int($key) ? $key + 1 : $key, $value);
             }
+            $statement->execute();
 
-            if ($leftValue === null) {
-                return $direction === 'asc' ? -1 : 1;
-            }
+            $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
 
-            if ($rightValue === null) {
-                return $direction === 'asc' ? 1 : -1;
-            }
-
-            if (is_numeric($leftValue) && is_numeric($rightValue)) {
-                return $direction === 'asc' ? ($leftValue <=> $rightValue) : ($rightValue <=> $leftValue);
-            }
-
-            $comparison = strnatcasecmp((string) $leftValue, (string) $rightValue);
-
-            return $direction === 'asc' ? $comparison : -$comparison;
-        });
-
-        return $data;
+            return is_array($rows) ? $rows : [];
+        } catch (PDOException $exception) {
+            throw new RuntimeException('Failed to execute MySQL query: ' . $exception->getMessage(), 0, $exception);
+        }
     }
 
-    /**
-     * @template T of array<string, mixed>
-     * @param array<int, T> $items
-     * @param callable(T): string|null $packageResolver
-     * @param callable(T): array<string, float|int> $metricsResolver
-     * @return array<string, array<string, float>>
-     */
-    protected function aggregateByPackage(array $items, callable $packageResolver, callable $metricsResolver): array
+    protected function pipeline(array $data): ReportPipeline
     {
-        $aggregated = [];
-
-        foreach ($items as $item) {
-            $package = $packageResolver($item);
-            if ($package === null || $package === '') {
-                $package = 'unknown';
-            }
-
-            $metrics = $metricsResolver($item);
-            if (!is_array($metrics)) {
-                continue;
-            }
-
-            if (!isset($aggregated[$package])) {
-                $aggregated[$package] = [];
-            }
-
-            foreach ($metrics as $name => $value) {
-                $numeric = is_numeric($value) ? (float) $value : 0.0;
-                $aggregated[$package][$name] = ($aggregated[$package][$name] ?? 0.0) + $numeric;
-            }
-        }
-
-        return $aggregated;
+        return new ReportPipeline($data);
     }
 
-    /**
-     * @param array<string, array<string, float>> $current
-     * @param array<string, array<string, float>> $previous
-     * @param string $metric
-     * @return array<string, array<string, float>>
-     */
-    protected function compareTwoPeriodsByPackage(array $current, array $previous, string $metric): array
+    protected function helpers(): ReportHelpers
     {
-        $result = [];
-        $packages = array_unique(array_merge(array_keys($current), array_keys($previous)));
-
-        foreach ($packages as $package) {
-            $currentValue = $current[$package][$metric] ?? 0.0;
-            $previousValue = $previous[$package][$metric] ?? 0.0;
-            $difference = $currentValue - $previousValue;
-            $result[$package] = [
-                'current' => $currentValue,
-                'previous' => $previousValue,
-                'delta' => $difference,
-                'delta_percent' => $this->percent($difference, $previousValue),
-            ];
-        }
-
-        return $result;
+        return $this->helpers;
     }
 
-    /**
-     * @template T of array<string, mixed>
-     * @param array<int, T> $items
-     * @return array<string, T>
-     */
-    protected function indexBy(array $items, string $field): array
+    protected function remember(string $cacheKey, int $ttl, callable $callback): ReportResult
     {
-        $indexed = [];
-        foreach ($items as $item) {
-            if (!isset($item[$field])) {
-                continue;
-            }
-            $key = (string) $item[$field];
-            if ($key === '') {
-                continue;
-            }
-            $indexed[$key] = $item;
-        }
-
-        return $indexed;
-    }
-
-    /**
-     * @param array<int, array<string, mixed>> $items
-     */
-    protected function sumBy(array $items, string $field): float
-    {
-        $sum = 0.0;
-        foreach ($items as $item) {
-            if (!isset($item[$field])) {
-                continue;
-            }
-            $value = $item[$field];
-            if (is_numeric($value)) {
-                $sum += (float) $value;
-            }
-        }
-
-        return $sum;
-    }
-
-    protected function percent(float $part, float $total): float
-    {
-        if ($total == 0.0) {
-            return 0.0;
-        }
-
-        return ($part / $total) * 100.0;
-    }
-
-    /**
-     * @param array<string, mixed> $filters
-     * @return array<string, mixed>
-     */
-    protected function mergeIncludes(array $filters, array $requiredIncludes): array
-    {
-        if ($requiredIncludes === []) {
-            return $filters;
-        }
-
-        $existing = isset($filters['include']) ? $filters['include'] : null;
-        $normalized = [];
-
-        if (is_string($existing) && $existing !== '') {
-            $normalized = array_filter(array_map('trim', explode(',', $existing)));
-        } elseif (is_array($existing)) {
-            $normalized = array_filter(array_map(static fn ($value): string => is_scalar($value) ? trim((string) $value) : '', $existing));
-        }
-
-        $normalized = array_values(array_unique(array_merge($normalized, $requiredIncludes)));
-        $filters['include'] = implode(',', $normalized);
-
-        return $filters;
-    }
-
-    /**
-     * @param callable(): ReportResult $callback
-     */
-    protected function remember(array $filters, int $ttl, callable $callback): ReportResult
-    {
-        $cacheDisabled = false;
-        if (isset($filters['_cache_disabled'])) {
-            $cacheDisabled = (bool) $filters['_cache_disabled'];
-            unset($filters['_cache_disabled']);
-        }
-
-        if (isset($filters['_cache_ttl_override']) && is_numeric($filters['_cache_ttl_override'])) {
-            $ttl = max(0, (int) $filters['_cache_ttl_override']);
-            unset($filters['_cache_ttl_override']);
-        }
-
-        if ($cacheDisabled || $ttl <= 0 || $this->redis === null) {
+        if ($ttl <= 0 || $this->redis === null) {
             return $callback();
         }
-
-        $cacheKey = $this->cacheKey($filters);
 
         try {
             $cached = $this->redis->get($cacheKey);
@@ -332,7 +151,7 @@ abstract class BaseReport implements ReportInterface
             $payload = json_decode($cached, true);
             if (is_array($payload) && isset($payload['data'], $payload['summary'], $payload['meta'], $payload['columns'])) {
                 $meta = is_array($payload['meta']) ? $payload['meta'] : [];
-                $meta['cache_hit'] = true;
+                $meta['cache'] = ($meta['cache'] ?? []) + ['hit' => true, 'key' => $cacheKey];
 
                 return new ReportResult(
                     $payload['data'],
@@ -344,6 +163,9 @@ abstract class BaseReport implements ReportInterface
         }
 
         $result = $callback();
+        $meta = $result->meta;
+        $meta['cache'] = ($meta['cache'] ?? []) + ['hit' => false, 'key' => $cacheKey];
+        $result->meta = $meta;
 
         $payload = [
             'data' => $result->data,
@@ -355,12 +177,30 @@ abstract class BaseReport implements ReportInterface
         try {
             $this->redis->setex($cacheKey, $ttl, json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
         } catch (PredisException) {
-            // ignore cache write failures
+            // ignore cache errors
         }
 
         return $result;
     }
 
+    protected function makeCacheKey(string $reportKey, array $query): string
+    {
+        ksort($query);
+
+        return sprintf('evyapi:report:%s:%s', $reportKey, sha1((string) json_encode($query, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)));
+    }
+
+    /**
+     * @param array<string, mixed> $record
+     */
+    protected function ruleManager(array $record = []): RuleManager
+    {
+        return new RuleManager();
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
     protected function extractQueryFromLink(string $link): ?array
     {
         $components = parse_url($link);
@@ -375,52 +215,107 @@ abstract class BaseReport implements ReportInterface
 
         return $query === [] ? null : $query;
     }
-
-    /**
-     * @param array<string, mixed> $filters
-     */
-    protected function extractTraceId(array &$filters): string
-    {
-        if (isset($filters['_trace_id']) && is_string($filters['_trace_id']) && $filters['_trace_id'] !== '') {
-            $traceId = $filters['_trace_id'];
-            unset($filters['_trace_id']);
-
-            return $traceId;
-        }
-
-        return bin2hex(random_bytes(8));
-    }
-
-    /**
-     * @param array<string, Validatable> $rules
-     * @param array<string, mixed> $filters
-     * @return array<int, array<string, string>>
-     */
-    protected function validateFilters(array $rules, array $filters): array
-    {
-        $errors = [];
-
-        foreach ($rules as $field => $rule) {
-            $value = $filters[$field] ?? null;
-            try {
-                $rule->assert($value);
-            } catch (\Respect\Validation\Exceptions\NestedValidationException $exception) {
-                $errors[] = [
-                    'field' => $field,
-                    'message' => $exception->getMessages()[0] ?? 'Invalid value.',
-                ];
-            }
-        }
-
-        return $errors;
-    }
 }
 
+final class ReportPipeline
+{
+    /**
+     * @var array<int, mixed>
+     */
+    private array $data;
 
+    public function __construct(array $data)
+    {
+        $this->data = $data;
+    }
 
+    public function filter(callable $callback): self
+    {
+        $this->data = array_values(array_filter($this->data, $callback));
 
+        return $this;
+    }
 
+    public function map(callable $callback): self
+    {
+        $this->data = array_values(array_map($callback, $this->data));
 
+        return $this;
+    }
 
+    /**
+     * @param callable|null $aggregator function(string $groupKey, array<int, mixed> $items): mixed
+     */
+    public function groupBy(callable $keyResolver, ?callable $aggregator = null): self
+    {
+        $grouped = [];
+        foreach ($this->data as $item) {
+            $key = $keyResolver($item);
+            if (!is_string($key) && !is_int($key)) {
+                $key = (string) $key;
+            }
+            $grouped[$key][] = $item;
+        }
 
+        if ($aggregator !== null) {
+            $result = [];
+            foreach ($grouped as $key => $items) {
+                $result[$key] = $aggregator($key, $items);
+            }
+            $this->data = array_values($result);
+        } else {
+            $this->data = $grouped;
+        }
 
+        return $this;
+    }
+
+    public function sort(string $field, string $direction = 'asc'): self
+    {
+        usort($this->data, static function ($left, $right) use ($field, $direction): int {
+            $l = is_array($left) ? ($left[$field] ?? null) : null;
+            $r = is_array($right) ? ($right[$field] ?? null) : null;
+
+            if ($l === $r) {
+                return 0;
+            }
+
+            if ($l === null) {
+                return $direction === 'asc' ? -1 : 1;
+            }
+
+            if ($r === null) {
+                return $direction === 'asc' ? 1 : -1;
+            }
+
+            if (is_numeric($l) && is_numeric($r)) {
+                return $direction === 'asc' ? ($l <=> $r) : ($r <=> $l);
+            }
+
+            return $direction === 'asc'
+                ? strnatcasecmp((string) $l, (string) $r)
+                : strnatcasecmp((string) $r, (string) $l);
+        });
+
+        return $this;
+    }
+
+    public function paginate(int $page, int $perPage): array
+    {
+        $page = max(1, $page);
+        $perPage = max(1, $perPage);
+
+        $offset = ($page - 1) * $perPage;
+        $slice = array_slice($this->data, $offset, $perPage);
+
+        return $slice;
+    }
+
+    /**
+     * @return array<int, mixed>
+     */
+    public function toArray(): array
+    {
+        return $this->data;
+    }
+}
