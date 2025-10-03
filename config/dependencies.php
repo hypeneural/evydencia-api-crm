@@ -10,6 +10,7 @@ use App\Application\Services\ReportService;
 use App\Application\Services\ScheduledPostService;
 use App\Application\Services\WhatsAppService;
 use App\Application\Support\ApiResponder;
+use App\Application\Support\CampaignSchedulePayloadNormalizer;
 use App\Application\Support\QueryMapper;
 use App\Domain\Repositories\BlacklistRepositoryInterface;
 use App\Domain\Repositories\OrderRepositoryInterface;
@@ -136,6 +137,9 @@ return static function (ContainerBuilder $containerBuilder): void {
         },
         ApiResponder::class => static function (ContainerInterface $container): ApiResponder {
             return new ApiResponder($container->get(Settings::class));
+        },
+        CampaignSchedulePayloadNormalizer::class => static function (ContainerInterface $container): CampaignSchedulePayloadNormalizer {
+            return new CampaignSchedulePayloadNormalizer($container->get(Settings::class));
         },
         EvydenciaApiClient::class => static function (ContainerInterface $container): EvydenciaApiClient {
             return new EvydenciaApiClient(

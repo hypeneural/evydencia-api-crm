@@ -17,12 +17,14 @@ final class QueryMapper
      * @var array<string, string>
      */
     private const ORDER_EQUAL_FILTERS = [
+        'order_id' => 'order[id]',
         'uuid' => 'order[uuid]',
         'status' => 'order[status]',
         'customer_id' => 'customer[id]',
         'customer_uuid' => 'customer[uuid]',
         'customer_email' => 'customer[email]',
         'customer_whatsapp' => 'customer[whatsapp]',
+        'customer_document' => 'customer[document]',
         'product_uuid' => 'product[uuid]',
         'product_name' => 'product[name]',
         'product_slug' => 'product[slug]',
@@ -58,10 +60,12 @@ final class QueryMapper
      * @var array<string, string>
      */
     private const ORDER_TOP_LEVEL_EQUAL = [
+        'order_id' => 'order[id]',
         'status' => 'order[status]',
         'customer_uuid' => 'customer[uuid]',
         'customer_email' => 'customer[email]',
         'customer_whatsapp' => 'customer[whatsapp]',
+        'customer_document' => 'customer[document]',
         'product_uuid' => 'product[uuid]',
         'product_name' => 'product[name]',
         'product_slug' => 'product[slug]',
@@ -86,6 +90,35 @@ final class QueryMapper
     private const ORDER_TOP_LEVEL_LIKE = [
         'customer_name' => 'customer[name]',
     ];
+
+    private const ORDER_STRUCTURED_MAPPING = [
+        'order' => [
+            'id' => ['alias' => 'order_id', 'type' => 'equal'],
+            'uuid' => ['alias' => 'uuid', 'type' => 'equal'],
+            'status' => ['alias' => 'status', 'type' => 'equal'],
+            'created-start' => ['alias' => 'created_at', 'type' => 'range', 'operator' => 'gte'],
+            'created-end' => ['alias' => 'created_at', 'type' => 'range', 'operator' => 'lte'],
+            'session-start' => ['alias' => 'session_at', 'type' => 'range', 'operator' => 'gte'],
+            'session-end' => ['alias' => 'session_at', 'type' => 'range', 'operator' => 'lte'],
+            'selection-start' => ['alias' => 'selection_at', 'type' => 'range', 'operator' => 'gte'],
+            'selection-end' => ['alias' => 'selection_at', 'type' => 'range', 'operator' => 'lte'],
+        ],
+        'customer' => [
+            'id' => ['alias' => 'customer_id', 'type' => 'equal'],
+            'uuid' => ['alias' => 'customer_uuid', 'type' => 'equal'],
+            'name' => ['alias' => 'customer_name', 'type' => 'like'],
+            'email' => ['alias' => 'customer_email', 'type' => 'equal'],
+            'whatsapp' => ['alias' => 'customer_whatsapp', 'type' => 'equal'],
+            'document' => ['alias' => 'customer_document', 'type' => 'equal'],
+        ],
+        'product' => [
+            'uuid' => ['alias' => 'product_uuid', 'type' => 'equal'],
+            'name' => ['alias' => 'product_name', 'type' => 'equal'],
+            'slug' => ['alias' => 'product_slug', 'type' => 'equal'],
+            'reference' => ['alias' => 'product_ref', 'type' => 'equal'],
+        ],
+    ];
+
 
     /**
      * @var array<string, string>
@@ -332,6 +365,8 @@ final class QueryMapper
      */
     private function mapOrderFilters(array $filters): array
     {
+        $filters = $this->expandOrderStructuredFilters($filters);
+
         $mapped = [];
 
         foreach (self::ORDER_EQUAL_FILTERS as $source => $target) {
@@ -746,6 +781,86 @@ final class QueryMapper
         }
 
         return $mapped;
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<string, mixed>
+     */
+    private function expandOrderStructuredFilters(array $filters): array
+    {
+        $expanded = [];
+
+        foreach (self::ORDER_STRUCTURED_MAPPING as $namespace => $fieldMap) {
+            if (!isset($filters[$namespace]) || !is_array($filters[$namespace])) {
+                continue;
+            }
+
+            foreach ($fieldMap as $field => $definition) {
+                if (!array_key_exists($field, $filters[$namespace])) {
+                    continue;
+                }
+
+                $alias = $definition['alias'];
+                $type = $definition['type'];
+                $value = $filters[$namespace][$field];
+
+                if ($type === 'equal') {
+                    if (!array_key_exists($alias, $filters) && !array_key_exists($alias, $expanded)) {
+                        $expanded[$alias] = $value;
+                    }
+                    continue;
+                }
+
+                if ($type === 'like') {
+                    if (array_key_exists($alias, $filters) || array_key_exists($alias, $expanded)) {
+                        continue;
+                    }
+
+                    if (is_array($value)) {
+                        $candidate = $value['like'] ?? $value['eq'] ?? null;
+                    } else {
+                        $candidate = $value;
+                    }
+
+                    if ($candidate !== null) {
+                        $expanded[$alias] = ['like' => $candidate];
+                    }
+                    continue;
+                }
+
+                if ($type === 'range') {
+                    $operator = $definition['operator'];
+                    $existing = [];
+
+                    if (isset($filters[$alias]) && is_array($filters[$alias])) {
+                        $existing = $filters[$alias];
+                    }
+
+                    if (isset($expanded[$alias]) && is_array($expanded[$alias])) {
+                        $existing = array_merge($existing, $expanded[$alias]);
+                    }
+
+                    if (is_array($value)) {
+                        if (isset($value[$operator])) {
+                            $existing[$operator] = $value[$operator];
+                        }
+                    } else {
+                        $existing[$operator] = $value;
+                    }
+
+                    if ($existing !== []) {
+                        $expanded[$alias] = $existing;
+                    }
+                }
+            }
+        }
+
+        if ($expanded === []) {
+            return $filters;
+        }
+
+        return array_merge($filters, $expanded);
     }
 
     /**

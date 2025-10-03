@@ -160,9 +160,17 @@ Com Laragon/Apache, aponte o DocumentRoot para `public/` e mantenha o `.htaccess
 #### /v1/orders/search
 
 - **GET**: proxy para busca de pedidos no CRM.
-- Autenticação obrigatória.
-- Filtros principais: `filter[status]`, `filter[created_at][gte|lte]`, `customer_email`, `product_slug`, `fetch=all`, paginação (`page`, `per_page`), ordenação (`sort=-created_at`) e projeção (`fields[orders]=id,uuid,status`).
-- Suporta `q` e parâmetros pass-through (`order[status]=...`).
+- Autenticacao obrigatoria.
+- Aliases aceitos em `filter[...]` (mapeados para os parametros do CRM):
+  - `filter[order_id]` -> `order[id]`
+  - `filter[uuid]` -> `order[uuid]`
+  - `filter[status]` -> `order[status]`
+  - `filter[customer_id]`, `filter[customer_uuid]`, `filter[customer_email]`, `filter[customer_whatsapp]`, `filter[customer_document]`
+  - `filter[product_uuid]`, `filter[product_name]`, `filter[product_slug]`, `filter[product_ref]`
+  - `filter[created_at][gte|lte]`, `filter[session_at][gte|lte]`, `filter[selection_at][gte|lte]`
+  - `filter[customer_name][like]`
+- Parametros CRM aceitos diretamente (pass-through): `order[id]`, `order[uuid]`, `order[status]`, `order[created-start]`, `order[created-end]`, `order[session-start]`, `order[session-end]`, `order[selection-start]`, `order[selection-end]`, `customer[id]`, `customer[uuid]`, `customer[name]`, `customer[email]`, `customer[whatsapp]`, `customer[document]`, `product[uuid]`, `product[name]`, `product[slug]`, `product[reference]`.
+- Paginar com `page`/`per_page`, ordenar via `sort` (ex.: `sort=-created_at`), projetar campos com `fields[orders]=id,uuid,status`, utilizar `fetch=all` para coleta paginada e `q` para busca textual.
 
 #### /v1/orders/{uuid}
 
@@ -182,7 +190,16 @@ Com Laragon/Apache, aponte o DocumentRoot para `public/` e mantenha o `.htaccess
 #### /v1/campaigns/schedule
 
 - **GET**: agenda de campanhas no CRM.
-- Filtros: `campaign_id`, `contact_phone`, DSL de paginação e ordenação.
+- Filtros: `campaign_id`, `contact_phone`, DSL de paginacao e ordenacao.
+- **POST** (`/v1/campaigns/schedule/execute`): agenda execucao de disparos no CRM.
+  - Campos obrigatorios: `campaign` (inteiro > 0), `start_at` (ISO 8601; respeita o timezone configurado e envia o valor ao CRM em UTC) e `contacts`.
+  - Formatos aceitos para `contacts`:
+    - string com linhas `dddnumero;Nome` separadas por `
+`;
+    - array de strings (cada item vira uma linha);
+    - array de hashes (as chaves formam o cabecalho `phone;name;coupon` e cada linha eh serializada como CSV com `;`).
+  - Campos opcionais: `finish_at` (mesmo formato de data, deve ser maior ou igual a `start_at`), `instance`, `use_leads_system`, `order`, `customer`, `product.reference`, `product.slug`. A chave legada `product.referecen` eh normalizada para `product.reference`.
+  - Datas sao enviadas como `YYYY-MM-DDTHH:MM:SSZ` e payloads invalidos retornam 422 com os erros de validacao.
 
 ### Blacklist de WhatsApp (recurso local)
 

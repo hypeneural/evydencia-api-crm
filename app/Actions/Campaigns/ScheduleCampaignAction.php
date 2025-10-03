@@ -6,8 +6,10 @@ namespace App\Actions\Campaigns;
 
 use App\Application\Services\CampaignService;
 use App\Application\Support\ApiResponder;
+use App\Application\Support\CampaignSchedulePayloadNormalizer;
 use App\Domain\Exception\CrmRequestException;
 use App\Domain\Exception\CrmUnavailableException;
+use App\Domain\Exception\ValidationException;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Log\LoggerInterface;
@@ -17,6 +19,7 @@ final class ScheduleCampaignAction
 {
     public function __construct(
         private readonly CampaignService $campaignService,
+        private readonly CampaignSchedulePayloadNormalizer $payloadNormalizer,
         private readonly ApiResponder $responder,
         private readonly LoggerInterface $logger
     ) {
@@ -25,12 +28,18 @@ final class ScheduleCampaignAction
     public function __invoke(Request $request, Response $response): Response
     {
         $traceId = $this->resolveTraceId($request);
-        $payload = $this->normalizePayload($request->getParsedBody());
+        $rawPayload = $this->normalizePayload($request->getParsedBody());
 
-        if ($payload === null) {
+        if ($rawPayload === null) {
             return $this->responder->validationError($response, $traceId, [
                 ['field' => 'body', 'message' => 'Payload deve ser um objeto JSON.'],
             ]);
+        }
+
+        try {
+            $payload = $this->payloadNormalizer->normalize($rawPayload);
+        } catch (ValidationException $exception) {
+            return $this->responder->validationError($response, $traceId, $exception->getErrors());
         }
 
         try {
