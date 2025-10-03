@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Application\Services\BlacklistService;
 use App\Application\Services\CampaignService;
 use App\Application\Services\OrderService;
+use App\Application\Services\ReportEngine;
 use App\Application\Services\ReportService;
 use App\Application\Services\ScheduledPostService;
 use App\Application\Services\WhatsAppService;
@@ -186,6 +187,15 @@ return static function (ContainerBuilder $containerBuilder): void {
                 $debug
             );
         },
+        ReportEngine::class => static function (ContainerInterface $container): ReportEngine {
+            return new ReportEngine(
+                $container->get(EvydenciaApiClient::class),
+                $container->get(QueryMapper::class),
+                $container->get('redis.client'),
+                $container->get(LoggerInterface::class),
+                __DIR__ . '/reports.php'
+            );
+        },
         ReportService::class => static function (ContainerInterface $container): ReportService {
             return new ReportService(
                 $container->get(EvydenciaApiClient::class),
@@ -207,3 +217,7 @@ return static function (ContainerBuilder $containerBuilder): void {
         },
     ]);
 };
+
+
+
+

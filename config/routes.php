@@ -14,10 +14,9 @@ use App\Actions\HealthCheckAction;
 use App\Actions\Orders\GetOrderDetailAction;
 use App\Actions\Orders\SearchOrdersAction;
 use App\Actions\Orders\UpdateOrderStatusAction;
-use App\Actions\Reports\GetChristmasOrdersWithoutParticipantsAction;
-use App\Actions\Reports\GetCustomersWithChristmasOrdersAction;
-use App\Actions\Reports\GetCustomersWithoutChristmasOrdersAction;
-use App\Actions\Reports\GetSoldItemsAction;
+use App\Actions\Reports\ExportReportAction;
+use App\Actions\Reports\ListReportsAction;
+use App\Actions\Reports\RunReportAction;
 use App\Actions\ScheduledPosts\CreateScheduledPostAction;
 use App\Actions\ScheduledPosts\DeleteScheduledPostAction;
 use App\Actions\ScheduledPosts\GetReadyScheduledPostsAction;
@@ -70,10 +69,9 @@ return function (App $app): void {
         });
 
         $group->group('/reports', function (RouteCollectorProxy $reports): void {
-            $reports->get('/sold-items', GetSoldItemsAction::class);
-            $reports->get('/christmas-orders-without-participants', GetChristmasOrdersWithoutParticipantsAction::class);
-            $reports->get('/customers-without-christmas-orders', GetCustomersWithoutChristmasOrdersAction::class);
-            $reports->get('/customers-with-christmas-orders', GetCustomersWithChristmasOrdersAction::class);
+            $reports->get('', ListReportsAction::class);
+            $reports->get('/{key}', RunReportAction::class);
+            $reports->post('/{key}/export', ExportReportAction::class);
         });
 
         $group->group('/campaigns', function (RouteCollectorProxy $campaigns): void {
@@ -83,4 +81,3 @@ return function (App $app): void {
         });
     });
 };
-
