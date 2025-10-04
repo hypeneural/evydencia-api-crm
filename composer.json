@@ -24,7 +24,7 @@
     "post-install-cmd": [
       "@php -r \"if(!is_dir('var/logs')) mkdir('var/logs', 0777, true);\""
     ],
-    "openapi:build": "vendor/bin/openapi --format json --output public/openapi.json app config"
+    "openapi:build": "vendor/bin/openapi --format json --output public/openapi.json app/OpenApi app/Actions"
   },
   "require-dev": {
     "zircote/swagger-php": "^4.10",

@@ -2,12 +2,13 @@
 declare(strict_types=1);
 
 namespace App\OpenApi\Schemas;
+use OpenApi\Annotations as OA;
 
 /**
  * @OA\Schema(
  *     schema="PaginationMeta",
  *     type="object",
- *     description="Metadados de paginação e telemetria.",
+ *     description="Metadados de paginaÃ§Ã£o e telemetria.",
  *     @OA\Property(property="page", type="integer", example=1),
  *     @OA\Property(property="per_page", type="integer", example=50, nullable=true),
  *     @OA\Property(property="total", type="integer", example=120, nullable=true),
@@ -29,8 +30,24 @@ namespace App\OpenApi\Schemas;
  *     schema="ErrorDetail",
  *     type="object",
  *     @OA\Property(property="field", type="string", example="status"),
- *     @OA\Property(property="message", type="string", example="Valor inválido."),
+ *     @OA\Property(property="message", type="string", example="Valor invÃ¡lido."),
  *     @OA\Property(property="code", type="string", nullable=true, example="validation_error")
+ * )
+ *
+ * @OA\Schema(
+ *     schema="Error",
+ *     type="object",
+ *     required={"code","message"},
+ *     @OA\Property(property="code", type="string", example="unprocessable_entity"),
+ *     @OA\Property(property="message", type="string", example="Parametros invalidos."),
+ *     @OA\Property(property="details", type="object", nullable=true, example={"provider_status":502,"provider_response":"Timeout while calling upstream"}),
+ *     @OA\Property(
+ *         property="errors",
+ *         type="array",
+ *         nullable=true,
+ *         description="Lista opcional com erros de validacao por campo.",
+ *         @OA\Items(ref="#/components/schemas/ErrorDetail")
+ *     )
  * )
  *
  * @OA\Schema(
@@ -38,22 +55,18 @@ namespace App\OpenApi\Schemas;
  *     type="object",
  *     required={"success","error","trace_id"},
  *     @OA\Property(property="success", type="boolean", example=false),
+ *     @OA\Property(property="error", ref="#/components/schemas/Error"),
+ *     @OA\Property(property="trace_id", type="string", example="a1b2c3d4e5f6a7b8"),
  *     @OA\Property(
- *         property="error",
+ *         property="meta",
  *         type="object",
- *         required={"code","message"},
- *         @OA\Property(property="code", type="string", example="unprocessable_entity"),
- *         @OA\Property(property="message", type="string", example="Parâmetros inválidos."),
- *         @OA\Property(property="details", type="object", nullable=true),
- *         @OA\Property(
- *             property="errors",
- *             type="array",
- *             nullable=true,
- *             @OA\Items(ref="#/components/schemas/ErrorDetail")
- *         )
- *     ),
- *     @OA\Property(property="trace_id", type="string", example="a1b2c3d4e5f6a7b8")
+ *         nullable=true,
+ *         description="Contexto opcional sobre a falha",
+ *         @OA\Property(property="timestamp", type="string", format="date-time", example="2025-10-03T18:20:00Z"),
+ *         @OA\Property(property="correlation_id", type="string", nullable=true)
+ *     )
  * )
+
  *
  * @OA\Schema(
  *     schema="SuccessEnvelope",
@@ -63,7 +76,7 @@ namespace App\OpenApi\Schemas;
  *     @OA\Property(property="meta", ref="#/components/schemas/PaginationMeta"),
  *     @OA\Property(property="links", ref="#/components/schemas/StandardLinks"),
  *     @OA\Property(property="trace_id", type="string", example="a1b2c3d4e5f6a7b8"),
- *     @OA\Property(property="data", description="Carga útil da resposta", nullable=true)
+ *     @OA\Property(property="data", description="Carga Ãºtil da resposta", nullable=true)
  * )
  *
  * @OA\Schema(
@@ -78,7 +91,7 @@ namespace App\OpenApi\Schemas;
  * @OA\Schema(
  *     schema="GenericRecord",
  *     type="object",
- *     description="Objeto flexível com chaves dinâmicas.",
+ *     description="Objeto flexÃ­vel com chaves dinÃ¢micas.",
  *     additionalProperties=true
  * )
  *
@@ -89,7 +102,7 @@ namespace App\OpenApi\Schemas;
  *     @OA\Property(property="name", type="string", example="Cliente Bloqueado"),
  *     @OA\Property(property="whatsapp", type="string", example="5511999999999"),
  *     @OA\Property(property="has_closed_order", type="boolean", description="Marca se o contato possui pedido fechado.", example=false),
- *     @OA\Property(property="observation", type="string", nullable=true, example="Observa��o opcional")
+ *     @OA\Property(property="observation", type="string", nullable=true, example="Observaï¿½ï¿½o opcional")
  * )
  *
  * @OA\Schema(
@@ -176,7 +189,7 @@ namespace App\OpenApi\Schemas;
  *     type="object",
  *     required={"phone","message"},
  *     @OA\Property(property="phone", type="string", example="5511999999999"),
- *     @OA\Property(property="message", type="string", example="Ol�, tudo bem?")
+ *     @OA\Property(property="message", type="string", example="Olï¿½, tudo bem?")
  * )
  *
  * @OA\Schema(
@@ -184,7 +197,7 @@ namespace App\OpenApi\Schemas;
  *     type="object",
  *     required={"phone","audio"},
  *     @OA\Property(property="phone", type="string"),
- *     @OA\Property(property="audio", type="string", description="Base64 ou URL p�blica do �udio."),
+ *     @OA\Property(property="audio", type="string", description="Base64 ou URL pï¿½blica do ï¿½udio."),
  *     @OA\Property(property="delayMessage", type="integer", nullable=true),
  *     @OA\Property(property="delayTyping", type="integer", nullable=true),
  *     @OA\Property(property="viewOnce", type="boolean", nullable=true),
@@ -197,7 +210,7 @@ namespace App\OpenApi\Schemas;
  *     type="object",
  *     required={"phone","image"},
  *     @OA\Property(property="phone", type="string"),
- *     @OA\Property(property="image", type="string", description="Base64 ou URL p�blica da imagem."),
+ *     @OA\Property(property="image", type="string", description="Base64 ou URL pï¿½blica da imagem."),
  *     @OA\Property(property="caption", type="string", nullable=true),
  *     @OA\Property(property="messageId", type="string", nullable=true),
  *     @OA\Property(property="delayMessage", type="integer", nullable=true),
@@ -210,7 +223,7 @@ namespace App\OpenApi\Schemas;
  *     required={"phone","extension","document"},
  *     @OA\Property(property="phone", type="string"),
  *     @OA\Property(property="extension", type="string", example="pdf"),
- *     @OA\Property(property="document", type="string", description="Base64 ou URL p�blica do arquivo."),
+ *     @OA\Property(property="document", type="string", description="Base64 ou URL pï¿½blica do arquivo."),
  *     @OA\Property(property="fileName", type="string", nullable=true),
  *     @OA\Property(property="caption", type="string", nullable=true),
  *     @OA\Property(property="messageId", type="string", nullable=true),
@@ -230,7 +243,7 @@ namespace App\OpenApi\Schemas;
  *     schema="WhatsAppStatusVideoPayload",
  *     type="object",
  *     required={"video"},
- *     @OA\Property(property="video", type="string", description="Base64 ou URL do v�deo."),
+ *     @OA\Property(property="video", type="string", description="Base64 ou URL do vï¿½deo."),
  *     @OA\Property(property="caption", type="string", nullable=true)
  * )
  *
@@ -274,7 +287,7 @@ namespace App\OpenApi\Schemas;
  *     @OA\Property(property="campaign", type="integer", example=1234),
  *     @OA\Property(property="start_at", type="string", format="date-time", example="2025-10-03T15:30:00-03:00"),
  *     @OA\Property(property="finish_at", type="string", format="date-time", nullable=true),
- *     @OA\Property(property="contacts", type="array", description="Lista de contatos (n�meros ou e-mails).", @OA\Items(type="string")),
+ *     @OA\Property(property="contacts", type="array", description="Lista de contatos (nï¿½meros ou e-mails).", @OA\Items(type="string")),
  *     @OA\Property(property="use_leads_system", type="boolean", example=false),
  *     @OA\Property(property="instance", type="integer", nullable=true),
  *     @OA\Property(property="order", type="integer", nullable=true),
@@ -388,5 +401,7 @@ namespace App\OpenApi\Schemas;
 final class CommonSchemas
 {
 }
+
+
 
 
