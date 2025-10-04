@@ -213,7 +213,7 @@ return static function (ContainerBuilder $containerBuilder): void {
                 $container->get(LoggerInterface::class)
             );
         },
-        OrderService::class => static function (ContainerInterface $container): OrderService {
+\ \ \ \ \ \ \ \ LabelService::class\ =>\ static\ function\ \(ContainerInterface\ \):\ LabelService\ \{\r\n\ \ \ \ \ \ \ \ \ \ \ \ return\ new\ LabelService\(\r\n\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ ->get\(Settings::class\),\r\n\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ ->get\(LoggerInterface::class\)\r\n\ \ \ \ \ \ \ \ \ \ \ \ \);\r\n\ \ \ \ \ \ \ \ },\r\n\ \ \ \ \ \ \ \ OrderService::class\ =>\ static\ function\ \(ContainerInterface\ \):\ OrderService\ \{
             return new OrderService(
                 $container->get(EvydenciaApiClient::class),
                 $container->get(OrderRepositoryInterface::class),
@@ -250,6 +250,8 @@ return static function (ContainerBuilder $containerBuilder): void {
 
     ]);
 };
+
+
 
 
 
