@@ -1985,6 +1985,535 @@
                 }
             }
         },
+        "/v1/whatsapp/chats/{phone}/tags/{tag}/add": {
+            "put": {
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Atribui uma etiqueta a um chat do WhatsApp",
+                "operationId": "c5b3ba2390cc613d09f4247826b04eee",
+                "parameters": [
+                    {
+                        "name": "phone",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "5511999999999"
+                        }
+                    },
+                    {
+                        "name": "tag",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "Cliente"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Etiqueta atribuida",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WhatsAppGenericResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parametros invalidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Falha no provedor Z-API",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/whatsapp/contacts/add": {
+            "post": {
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Adiciona contatos na agenda vinculada ao WhatsApp",
+                "operationId": "6536b73c17ba925dac53f19c1d825507",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/WhatsAppContactEntry"
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Contatos enviados",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WhatsAppGenericResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parametros invalidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Falha no provedor Z-API",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/whatsapp/contacts/{phone}": {
+            "get": {
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Obtem metadata de um contato do WhatsApp",
+                "operationId": "81fdcf5234af801ad2cdd0bd4ce3a0b4",
+                "parameters": [
+                    {
+                        "name": "phone",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "5511999999999"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Metadata do contato",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WhatsAppContactResourceResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Telefone invalido",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Falha no provedor Z-API",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/whatsapp/profile-picture": {
+            "get": {
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Recupera a URL da foto de perfil mais recente",
+                "operationId": "cb2936b50f8e406c5d208d78b472dd91",
+                "parameters": [
+                    {
+                        "name": "phone",
+                        "in": "query",
+                        "description": "Telefone no formato DDI DDD NUMERO",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "5511999999999"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Foto encontrada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WhatsAppProfilePictureResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parametros invalidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Falha no provedor Z-API",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/whatsapp/contacts": {
+            "get": {
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Lista contatos sincronizados do WhatsApp",
+                "operationId": "c3c61dab7eabb44a4f5605c8e2cbd61a",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "pageSize",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 1000,
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Lista de contatos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WhatsAppContactsListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parametros invalidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Falha no provedor Z-API",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/whatsapp/message/pin": {
+            "post": {
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Fixar ou desafixar mensagem no WhatsApp",
+                "operationId": "00c5b2674ca831df7209cfd8035ada10",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/WhatsAppPinMessagePayload"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Acao aceita",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WhatsAppGenericResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parametros invalidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Falha no provedor Z-API",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/whatsapp/chats/{phone}/tags/{tag}/remove": {
+            "put": {
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Remove uma etiqueta de um chat do WhatsApp",
+                "operationId": "d48870eca916d6a2b0d9d16f5dea737e",
+                "parameters": [
+                    {
+                        "name": "phone",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "5511999999999"
+                        }
+                    },
+                    {
+                        "name": "tag",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "Cliente"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Etiqueta removida",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WhatsAppGenericResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parametros invalidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Falha no provedor Z-API",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/whatsapp/contacts/remove": {
+            "delete": {
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Remove contatos da agenda vinculada ao WhatsApp",
+                "operationId": "aa22cdc5022a9f4652a017f74d193aa5",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                    "example": "5511999999999"
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Contatos removidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WhatsAppGenericResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parametros invalidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Falha no provedor Z-API",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/v1/whatsapp/audio": {
             "post": {
                 "tags": [
@@ -2046,6 +2575,128 @@
                 }
             }
         },
+        "/v1/whatsapp/call": {
+            "post": {
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Inicia uma chamada pelo WhatsApp",
+                "operationId": "d90c5c5716978d10f5bae46f770ac775",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/WhatsAppCallPayload"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Ligacao iniciada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WhatsAppSendResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parametros invalidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Falha no provedor Z-API",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/whatsapp/carousel": {
+            "post": {
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Envia mensagem em carrosel via WhatsApp",
+                "operationId": "ab8a8bdf3e486744cc767b2974db502a",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/WhatsAppCarouselPayload"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Mensagem aceita",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WhatsAppSendResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parametros invalidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Falha no provedor Z-API",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/v1/whatsapp/document": {
             "post": {
                 "tags": [
@@ -2076,6 +2727,67 @@
                     },
                     "422": {
                         "description": "Parâmetros inválidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Falha no provedor Z-API",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/whatsapp/gif": {
+            "post": {
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Envia GIF (mp4) via WhatsApp",
+                "operationId": "65125ac681069332735df5ffb2157837",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/WhatsAppGifPayload"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Mensagem aceita",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WhatsAppSendResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parametros invalidos",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2229,6 +2941,311 @@
                 }
             }
         },
+        "/v1/whatsapp/link": {
+            "post": {
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Envia mensagem com link enriquecido via WhatsApp",
+                "operationId": "3c935f9208394865a800c876afd86e65",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/WhatsAppLinkPayload"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Mensagem aceita",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WhatsAppSendResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parametros invalidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Falha no provedor Z-API",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/whatsapp/location": {
+            "post": {
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Envia localizacao fixa via WhatsApp",
+                "operationId": "f10b8da966dbd703b9e75367b4a8902d",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/WhatsAppLocationPayload"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Mensagem aceita",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WhatsAppSendResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parametros invalidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Falha no provedor Z-API",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/whatsapp/option-list": {
+            "post": {
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Envia lista de opcoes via WhatsApp",
+                "operationId": "71d053657bdd28d9892051ff42980c3b",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/WhatsAppOptionListPayload"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Mensagem aceita",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WhatsAppSendResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parametros invalidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Falha no provedor Z-API",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/whatsapp/ptv": {
+            "post": {
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Envia PTV (video pre-gravado) via WhatsApp",
+                "operationId": "9347447517569470d1ede3d6c9f84d79",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/WhatsAppPtvPayload"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Mensagem aceita",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WhatsAppSendResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parametros invalidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Falha no provedor Z-API",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/whatsapp/sticker": {
+            "post": {
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Envia sticker via WhatsApp",
+                "operationId": "a9c2d09e9aa74bfcd7d46329e901d7e9",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/WhatsAppStickerPayload"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Mensagem aceita",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WhatsAppSendResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parametros invalidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Falha no provedor Z-API",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/v1/whatsapp/text": {
             "post": {
                 "tags": [
@@ -2259,6 +3276,67 @@
                     },
                     "422": {
                         "description": "Parâmetros inválidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Falha no provedor Z-API",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/whatsapp/status/text": {
+            "post": {
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Publica texto no status do WhatsApp",
+                "operationId": "9087fe6afc611747209d5a4dd801d21e",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/WhatsAppTextStatusPayload"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Status publicado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WhatsAppSendResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parametros invalidos",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2951,6 +4029,421 @@
                 },
                 "type": "object"
             },
+            "WhatsAppPtvPayload": {
+                "required": [
+                    "phone",
+                    "ptv"
+                ],
+                "properties": {
+                    "phone": {
+                        "type": "string"
+                    },
+                    "ptv": {
+                        "description": "Base64 ou URL publica do video.",
+                        "type": "string"
+                    },
+                    "messageId": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "delayMessage": {
+                        "type": "integer",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "WhatsAppLocationPayload": {
+                "required": [
+                    "phone",
+                    "title",
+                    "address",
+                    "latitude",
+                    "longitude"
+                ],
+                "properties": {
+                    "phone": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "address": {
+                        "type": "string"
+                    },
+                    "latitude": {
+                        "type": "string"
+                    },
+                    "longitude": {
+                        "type": "string"
+                    },
+                    "messageId": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "delayMessage": {
+                        "type": "integer",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "WhatsAppLinkPayload": {
+                "required": [
+                    "phone",
+                    "message",
+                    "image",
+                    "linkUrl",
+                    "title",
+                    "linkDescription"
+                ],
+                "properties": {
+                    "phone": {
+                        "type": "string"
+                    },
+                    "message": {
+                        "type": "string"
+                    },
+                    "image": {
+                        "description": "URL da imagem",
+                        "type": "string"
+                    },
+                    "linkUrl": {
+                        "description": "URL compartilhada",
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "linkDescription": {
+                        "type": "string"
+                    },
+                    "delayMessage": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "delayTyping": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "linkType": {
+                        "description": "SMALL, MEDIUM ou LARGE",
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "WhatsAppStickerPayload": {
+                "required": [
+                    "phone",
+                    "sticker"
+                ],
+                "properties": {
+                    "phone": {
+                        "type": "string"
+                    },
+                    "sticker": {
+                        "description": "Base64 ou URL publica do sticker.",
+                        "type": "string"
+                    },
+                    "messageId": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "delayMessage": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "stickerAuthor": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "WhatsAppGifPayload": {
+                "required": [
+                    "phone",
+                    "gif"
+                ],
+                "properties": {
+                    "phone": {
+                        "type": "string"
+                    },
+                    "gif": {
+                        "description": "Base64 ou URL (mp4) do GIF.",
+                        "type": "string"
+                    },
+                    "messageId": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "delayMessage": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "caption": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "WhatsAppCarouselButton": {
+                "required": [
+                    "type",
+                    "label"
+                ],
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "CALL",
+                            "URL",
+                            "REPLY"
+                        ]
+                    },
+                    "label": {
+                        "type": "string"
+                    },
+                    "phone": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "url": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true
+                    },
+                    "id": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "WhatsAppCarouselCard": {
+                "required": [
+                    "text",
+                    "image"
+                ],
+                "properties": {
+                    "text": {
+                        "type": "string"
+                    },
+                    "image": {
+                        "type": "string",
+                        "format": "uri"
+                    },
+                    "buttons": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/WhatsAppCarouselButton"
+                        },
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "WhatsAppCarouselPayload": {
+                "required": [
+                    "phone",
+                    "message",
+                    "carousel"
+                ],
+                "properties": {
+                    "phone": {
+                        "type": "string"
+                    },
+                    "message": {
+                        "type": "string"
+                    },
+                    "carousel": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/WhatsAppCarouselCard"
+                        }
+                    },
+                    "delayMessage": {
+                        "type": "integer",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "WhatsAppTextStatusPayload": {
+                "required": [
+                    "message"
+                ],
+                "properties": {
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "WhatsAppOptionListOption": {
+                "required": [
+                    "title"
+                ],
+                "properties": {
+                    "title": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "id": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "WhatsAppOptionListConfig": {
+                "required": [
+                    "title",
+                    "buttonLabel",
+                    "options"
+                ],
+                "properties": {
+                    "title": {
+                        "type": "string"
+                    },
+                    "buttonLabel": {
+                        "type": "string"
+                    },
+                    "options": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/WhatsAppOptionListOption"
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "WhatsAppOptionListPayload": {
+                "required": [
+                    "phone",
+                    "message",
+                    "optionList"
+                ],
+                "properties": {
+                    "phone": {
+                        "type": "string"
+                    },
+                    "message": {
+                        "type": "string"
+                    },
+                    "optionList": {
+                        "$ref": "#/components/schemas/WhatsAppOptionListConfig"
+                    },
+                    "delayMessage": {
+                        "type": "integer",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "WhatsAppPinMessagePayload": {
+                "required": [
+                    "phone",
+                    "messageId",
+                    "messageAction"
+                ],
+                "properties": {
+                    "phone": {
+                        "type": "string"
+                    },
+                    "messageId": {
+                        "type": "string"
+                    },
+                    "messageAction": {
+                        "type": "string",
+                        "enum": [
+                            "pin",
+                            "unpin"
+                        ]
+                    },
+                    "pinMessageDuration": {
+                        "type": "string",
+                        "enum": [
+                            "24_hours",
+                            "7_days",
+                            "30_days"
+                        ],
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "WhatsAppCallPayload": {
+                "required": [
+                    "phone"
+                ],
+                "properties": {
+                    "phone": {
+                        "type": "string"
+                    },
+                    "callDuration": {
+                        "type": "integer",
+                        "maximum": 15,
+                        "minimum": 1,
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "WhatsAppContactEntry": {
+                "required": [
+                    "firstName",
+                    "phone"
+                ],
+                "properties": {
+                    "firstName": {
+                        "type": "string"
+                    },
+                    "lastName": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "phone": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "WhatsAppContactResource": {
+                "properties": {
+                    "phone": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "short": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "vname": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "notify": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "imgUrl": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
             "WhatsAppStatusImagePayload": {
                 "required": [
                     "image"
@@ -3258,6 +4751,80 @@
                         "properties": {
                             "data": {
                                 "$ref": "#/components/schemas/WhatsAppSendResult"
+                            }
+                        },
+                        "type": "object"
+                    }
+                ]
+            },
+            "WhatsAppProfilePictureResource": {
+                "properties": {
+                    "link": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "WhatsAppProfilePictureResponse": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/SuccessEnvelope"
+                    },
+                    {
+                        "properties": {
+                            "data": {
+                                "$ref": "#/components/schemas/WhatsAppProfilePictureResource"
+                            }
+                        },
+                        "type": "object"
+                    }
+                ]
+            },
+            "WhatsAppGenericResponse": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/SuccessEnvelope"
+                    },
+                    {
+                        "properties": {
+                            "data": {
+                                "type": "object",
+                                "additionalProperties": true
+                            }
+                        },
+                        "type": "object"
+                    }
+                ]
+            },
+            "WhatsAppContactResourceResponse": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/SuccessEnvelope"
+                    },
+                    {
+                        "properties": {
+                            "data": {
+                                "$ref": "#/components/schemas/WhatsAppContactResource"
+                            }
+                        },
+                        "type": "object"
+                    }
+                ]
+            },
+            "WhatsAppContactsListResponse": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/SuccessEnvelope"
+                    },
+                    {
+                        "properties": {
+                            "data": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/WhatsAppContactResource"
+                                }
                             }
                         },
                         "type": "object"

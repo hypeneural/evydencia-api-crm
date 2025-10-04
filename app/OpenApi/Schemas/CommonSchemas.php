@@ -232,6 +232,169 @@ use OpenApi\Annotations as OA;
  * )
  *
  * @OA\Schema(
+ *     schema="WhatsAppPtvPayload",
+ *     type="object",
+ *     required={"phone","ptv"},
+ *     @OA\Property(property="phone", type="string"),
+ *     @OA\Property(property="ptv", type="string", description="Base64 ou URL publica do video."),
+ *     @OA\Property(property="messageId", type="string", nullable=true),
+ *     @OA\Property(property="delayMessage", type="integer", nullable=true)
+ * )
+ *
+ * @OA\Schema(
+ *     schema="WhatsAppLocationPayload",
+ *     type="object",
+ *     required={"phone","title","address","latitude","longitude"},
+ *     @OA\Property(property="phone", type="string"),
+ *     @OA\Property(property="title", type="string"),
+ *     @OA\Property(property="address", type="string"),
+ *     @OA\Property(property="latitude", type="string"),
+ *     @OA\Property(property="longitude", type="string"),
+ *     @OA\Property(property="messageId", type="string", nullable=true),
+ *     @OA\Property(property="delayMessage", type="integer", nullable=true)
+ * )
+ *
+ * @OA\Schema(
+ *     schema="WhatsAppLinkPayload",
+ *     type="object",
+ *     required={"phone","message","image","linkUrl","title","linkDescription"},
+ *     @OA\Property(property="phone", type="string"),
+ *     @OA\Property(property="message", type="string"),
+ *     @OA\Property(property="image", type="string", description="URL da imagem"),
+ *     @OA\Property(property="linkUrl", type="string", description="URL compartilhada"),
+ *     @OA\Property(property="title", type="string"),
+ *     @OA\Property(property="linkDescription", type="string"),
+ *     @OA\Property(property="delayMessage", type="integer", nullable=true),
+ *     @OA\Property(property="delayTyping", type="integer", nullable=true),
+ *     @OA\Property(property="linkType", type="string", nullable=true, description="SMALL, MEDIUM ou LARGE")
+ * )
+ *
+ * @OA\Schema(
+ *     schema="WhatsAppStickerPayload",
+ *     type="object",
+ *     required={"phone","sticker"},
+ *     @OA\Property(property="phone", type="string"),
+ *     @OA\Property(property="sticker", type="string", description="Base64 ou URL publica do sticker."),
+ *     @OA\Property(property="messageId", type="string", nullable=true),
+ *     @OA\Property(property="delayMessage", type="integer", nullable=true),
+ *     @OA\Property(property="stickerAuthor", type="string", nullable=true)
+ * )
+ *
+ * @OA\Schema(
+ *     schema="WhatsAppGifPayload",
+ *     type="object",
+ *     required={"phone","gif"},
+ *     @OA\Property(property="phone", type="string"),
+ *     @OA\Property(property="gif", type="string", description="Base64 ou URL (mp4) do GIF."),
+ *     @OA\Property(property="messageId", type="string", nullable=true),
+ *     @OA\Property(property="delayMessage", type="integer", nullable=true),
+ *     @OA\Property(property="caption", type="string", nullable=true)
+ * )
+ *
+ * @OA\Schema(
+ *     schema="WhatsAppCarouselButton",
+ *     type="object",
+ *     required={"type","label"},
+ *     @OA\Property(property="type", type="string", enum={"CALL","URL","REPLY"}),
+ *     @OA\Property(property="label", type="string"),
+ *     @OA\Property(property="phone", type="string", nullable=true),
+ *     @OA\Property(property="url", type="string", format="uri", nullable=true),
+ *     @OA\Property(property="id", type="string", nullable=true)
+ * )
+ *
+ * @OA\Schema(
+ *     schema="WhatsAppCarouselCard",
+ *     type="object",
+ *     required={"text","image"},
+ *     @OA\Property(property="text", type="string"),
+ *     @OA\Property(property="image", type="string", format="uri"),
+ *     @OA\Property(property="buttons", type="array", @OA\Items(ref="#/components/schemas/WhatsAppCarouselButton"), nullable=true)
+ * )
+ *
+ * @OA\Schema(
+ *     schema="WhatsAppCarouselPayload",
+ *     type="object",
+ *     required={"phone","message","carousel"},
+ *     @OA\Property(property="phone", type="string"),
+ *     @OA\Property(property="message", type="string"),
+ *     @OA\Property(property="carousel", type="array", @OA\Items(ref="#/components/schemas/WhatsAppCarouselCard")),
+ *     @OA\Property(property="delayMessage", type="integer", nullable=true)
+ * )
+ *
+ * @OA\Schema(
+ *     schema="WhatsAppTextStatusPayload",
+ *     type="object",
+ *     required={"message"},
+ *     @OA\Property(property="message", type="string" )
+ * )
+ *
+ * @OA\Schema(
+ *     schema="WhatsAppOptionListOption",
+ *     type="object",
+ *     required={"title"},
+ *     @OA\Property(property="title", type="string"),
+ *     @OA\Property(property="description", type="string", nullable=true),
+ *     @OA\Property(property="id", type="string", nullable=true)
+ * )
+ *
+ * @OA\Schema(
+ *     schema="WhatsAppOptionListConfig",
+ *     type="object",
+ *     required={"title","buttonLabel","options"},
+ *     @OA\Property(property="title", type="string"),
+ *     @OA\Property(property="buttonLabel", type="string"),
+ *     @OA\Property(property="options", type="array", @OA\Items(ref="#/components/schemas/WhatsAppOptionListOption"))
+ * )
+ *
+ * @OA\Schema(
+ *     schema="WhatsAppOptionListPayload",
+ *     type="object",
+ *     required={"phone","message","optionList"},
+ *     @OA\Property(property="phone", type="string"),
+ *     @OA\Property(property="message", type="string"),
+ *     @OA\Property(property="optionList", ref="#/components/schemas/WhatsAppOptionListConfig"),
+ *     @OA\Property(property="delayMessage", type="integer", nullable=true)
+ * )
+ *
+ * @OA\Schema(
+ *     schema="WhatsAppPinMessagePayload",
+ *     type="object",
+ *     required={"phone","messageId","messageAction"},
+ *     @OA\Property(property="phone", type="string"),
+ *     @OA\Property(property="messageId", type="string"),
+ *     @OA\Property(property="messageAction", type="string", enum={"pin","unpin"}),
+ *     @OA\Property(property="pinMessageDuration", type="string", nullable=true, enum={"24_hours","7_days","30_days"})
+ * )
+ *
+ * @OA\Schema(
+ *     schema="WhatsAppCallPayload",
+ *     type="object",
+ *     required={"phone"},
+ *     @OA\Property(property="phone", type="string"),
+ *     @OA\Property(property="callDuration", type="integer", nullable=true, minimum=1, maximum=15)
+ * )
+ *
+ * @OA\Schema(
+ *     schema="WhatsAppContactEntry",
+ *     type="object",
+ *     required={"firstName","phone"},
+ *     @OA\Property(property="firstName", type="string"),
+ *     @OA\Property(property="lastName", type="string", nullable=true),
+ *     @OA\Property(property="phone", type="string")
+ * )
+ *
+ * @OA\Schema(
+ *     schema="WhatsAppContactResource",
+ *     type="object",
+ *     @OA\Property(property="phone", type="string"),
+ *     @OA\Property(property="name", type="string", nullable=true),
+ *     @OA\Property(property="short", type="string", nullable=true),
+ *     @OA\Property(property="vname", type="string", nullable=true),
+ *     @OA\Property(property="notify", type="string", nullable=true),
+ *     @OA\Property(property="imgUrl", type="string", format="uri", nullable=true)
+ * )
+ *
+ * @OA\Schema(
  *     schema="WhatsAppStatusImagePayload",
  *     type="object",
  *     required={"image"},
@@ -378,6 +541,44 @@ use OpenApi\Annotations as OA;
  *     allOf={
  *         @OA\Schema(ref="#/components/schemas/SuccessEnvelope"),
  *         @OA\Schema(@OA\Property(property="data", ref="#/components/schemas/WhatsAppSendResult"))
+ *     }
+ * )
+ *
+ * @OA\Schema(
+ *     schema="WhatsAppProfilePictureResource",
+ *     type="object",
+ *     @OA\Property(property="link", type="string", format="uri", nullable=true)
+ * )
+ *
+ * @OA\Schema(
+ *     schema="WhatsAppProfilePictureResponse",
+ *     allOf={
+ *         @OA\Schema(ref="#/components/schemas/SuccessEnvelope"),
+ *         @OA\Schema(@OA\Property(property="data", ref="#/components/schemas/WhatsAppProfilePictureResource"))
+ *     }
+ * )
+ *
+ * @OA\Schema(
+ *     schema="WhatsAppGenericResponse",
+ *     allOf={
+ *         @OA\Schema(ref="#/components/schemas/SuccessEnvelope"),
+ *         @OA\Schema(@OA\Property(property="data", type="object", additionalProperties=true))
+ *     }
+ * )
+ *
+ * @OA\Schema(
+ *     schema="WhatsAppContactResourceResponse",
+ *     allOf={
+ *         @OA\Schema(ref="#/components/schemas/SuccessEnvelope"),
+ *         @OA\Schema(@OA\Property(property="data", ref="#/components/schemas/WhatsAppContactResource"))
+ *     }
+ * )
+ *
+ * @OA\Schema(
+ *     schema="WhatsAppContactsListResponse",
+ *     allOf={
+ *         @OA\Schema(ref="#/components/schemas/SuccessEnvelope"),
+ *         @OA\Schema(@OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/WhatsAppContactResource")))
  *     }
  * )
  *
