@@ -63,7 +63,14 @@ final class LabelService
         ],
         'url_template' => 'http://minhas.fotosdenatal.com/{id}',
         'copy_template' => '{primeiro}, acesse suas fotos no QR CODE ao lado',
-        'mock_data' => [\n            'nome_completo' => 'Anderson Marques Vieira',\n            'primeiro_nome' => 'ANDERSON',\n            'pacote' => 'Experiencia Entao e Natal',\n            'data' => '25/09/25',\n            'whats' => '48996425287',\n            'id' => '1515',\n        ],
+        'mock_data' => [
+            'nome_completo' => 'Anderson Marques Vieira',
+            'primeiro_nome' => 'ANDERSON',
+            'pacote' => 'Experiencia Entao e Natal',
+            'data' => '25/09/25',
+            'whats' => '48996425287',
+            'id' => '1515',
+        ],
     ];
 
     /**
@@ -604,6 +611,7 @@ final class LabelService
         return strtoupper($value);
     }
 }
+
 
 
 

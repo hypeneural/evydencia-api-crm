@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
@@ -115,5 +115,6 @@ final class GenerateOrderLabelAction
         return is_string($uuid) ? trim($uuid) : '';
     }
 }
+
 
 

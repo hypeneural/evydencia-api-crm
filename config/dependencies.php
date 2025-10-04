@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Application\Services\BlacklistService;
 use App\Application\Services\CampaignService;
+use App\Application\Services\LabelService;
 use App\Application\Services\OrderService;
 use App\Application\Services\ReportEngine;
 use App\Application\Services\ReportService;
@@ -213,7 +214,13 @@ return static function (ContainerBuilder $containerBuilder): void {
                 $container->get(LoggerInterface::class)
             );
         },
-\ \ \ \ \ \ \ \ LabelService::class\ =>\ static\ function\ \(ContainerInterface\ \):\ LabelService\ \{\r\n\ \ \ \ \ \ \ \ \ \ \ \ return\ new\ LabelService\(\r\n\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ ->get\(Settings::class\),\r\n\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ ->get\(LoggerInterface::class\)\r\n\ \ \ \ \ \ \ \ \ \ \ \ \);\r\n\ \ \ \ \ \ \ \ },\r\n\ \ \ \ \ \ \ \ OrderService::class\ =>\ static\ function\ \(ContainerInterface\ \):\ OrderService\ \{
+        LabelService::class => static function (ContainerInterface $container): LabelService {
+            return new LabelService(
+                $container->get(Settings::class),
+                $container->get(LoggerInterface::class)
+            );
+        },
+        OrderService::class => static function (ContainerInterface $container): OrderService {
             return new OrderService(
                 $container->get(EvydenciaApiClient::class),
                 $container->get(OrderRepositoryInterface::class),
@@ -250,6 +257,7 @@ return static function (ContainerBuilder $containerBuilder): void {
 
     ]);
 };
+
 
 
 

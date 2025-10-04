@@ -48,6 +48,7 @@ use OpenApi\Annotations as OA;
  *     @OA\Tag(name="Blacklist", description="Manage blocked WhatsApp contacts"),
  *     @OA\Tag(name="ScheduledPosts", description="Plan and monitor scheduled outbound messages"),
  *     @OA\Tag(name="Orders", description="CRM order search and lifecycle operations"),
+ *     @OA\Tag(name="Labels", description="Geracao de etiquetas para pedidos"),
  *     @OA\Tag(name="WhatsApp", description="WhatsApp bridge powered by Z-API"),
  *     @OA\Tag(name="Reports", description="Operational reports and exports"),
  *     @OA\Tag(name="Campaigns", description="Campaign scheduling and orchestration"),

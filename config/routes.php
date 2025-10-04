@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
@@ -12,6 +12,7 @@ use App\Actions\Campaigns\GetCampaignScheduleAction;
 use App\Actions\Campaigns\ScheduleCampaignAction;
 use App\Actions\Docs\ViewDocsAction;
 use App\Actions\HealthCheckAction;
+use App\Actions\Labels\GenerateOrderLabelAction;
 use App\Actions\Orders\GetOrderDetailAction;
 use App\Actions\Orders\SearchOrdersAction;
 use App\Actions\Orders\UpdateOrderStatusAction;
@@ -76,6 +77,7 @@ return function (App $app): void {
 
         $group->get('/orders/search', SearchOrdersAction::class);
         $group->get('/orders/{uuid}', GetOrderDetailAction::class);
+        $group->get('/orders/{uuid}/label', GenerateOrderLabelAction::class);
         $group->put('/orders/{uuid}/status', UpdateOrderStatusAction::class);
 
         $group->group('/whatsapp', function (RouteCollectorProxy $whatsapp): void {
@@ -117,3 +119,7 @@ return function (App $app): void {
         });
     });
 };
+
+
+
+

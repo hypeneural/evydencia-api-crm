@@ -54,6 +54,45 @@ return [
         'client_token' => $_ENV['ZAPI_CLIENT_TOKEN'] ?? '',
         'timeout' => isset($_ENV['ZAPI_TIMEOUT']) ? (float) $_ENV['ZAPI_TIMEOUT'] : 30.0,
     ],
+    'labels' => [
+        'dpi' => (int) ($_ENV['LABEL_DPI'] ?? 300),
+        'width_mm' => (float) ($_ENV['LABEL_WIDTH_MM'] ?? 100),
+        'height_mm' => (float) ($_ENV['LABEL_HEIGHT_MM'] ?? 40),
+        'margins_mm' => [
+            'top' => (float) ($_ENV['LABEL_MARGIN_TOP_MM'] ?? 0),
+            'right' => (float) ($_ENV['LABEL_MARGIN_RIGHT_MM'] ?? 0),
+            'bottom' => (float) ($_ENV['LABEL_MARGIN_BOTTOM_MM'] ?? 0),
+            'left' => (float) ($_ENV['LABEL_MARGIN_LEFT_MM'] ?? 0),
+        ],
+        'assets_dir' => dirname(__DIR__) . '/public/etiqueta',
+        'output_dir' => dirname(__DIR__) . '/public/etiqueta/out',
+        'filename_pattern' => $_ENV['LABEL_FILENAME'] ?? 'etiqueta_{id}.png',
+        'use_background' => filter_var($_ENV['LABEL_USE_BACKGROUND'] ?? 'true', FILTER_VALIDATE_BOOL),
+        'background' => $_ENV['LABEL_BACKGROUND'] ?? 'background.jpg',
+        'font' => $_ENV['LABEL_FONT'] ?? 'ArchivoBlack-Regular.ttf',
+        'color_bg' => [0, 0, 0],
+        'color_fg' => [255, 255, 255],
+        'layout' => [
+            'nome_full' => ['x' => '11%', 'y' => '20%', 'size_pt' => 32, 'max_w' => '60%', 'align' => 'left'],
+            'primeiro' => ['x' => '83%', 'y' => '42%', 'size_pt' => 27, 'max_w' => '14%', 'align' => 'center'],
+            'pacote' => ['x' => '12%', 'y' => '44%', 'size_pt' => 34, 'max_w' => '72%', 'align' => 'left'],
+            'data' => ['x' => '11%', 'y' => '66%', 'size_pt' => 37, 'max_w' => '30%', 'align' => 'left'],
+            'whats_ddd' => ['x' => '40%', 'y' => '66%', 'size_pt' => 20, 'max_w' => '7%', 'align' => 'left'],
+            'whats_num' => ['x' => '45%', 'y' => '66%', 'size_pt' => 30, 'max_w' => '33%', 'align' => 'left'],
+            'linha_url' => ['x' => '10%', 'y' => '84%', 'size_pt' => 28, 'max_w' => '50%', 'align' => 'left'],
+            'qrcode' => ['size_px' => 100, 'x' => '83%', 'y' => '71%', 'margin_modules' => 0, 'ec_level' => 'H'],
+        ],
+        'url_template' => $_ENV['LABEL_URL_TEMPLATE'] ?? 'http://minhas.fotosdenatal.com/{id}',
+        'copy_template' => $_ENV['LABEL_COPY_TEMPLATE'] ?? '{primeiro}, acesse suas fotos no QR CODE ao lado',
+        'mock_data' => [
+            'nome_completo' => $_ENV['LABEL_MOCK_NOME_COMPLETO'] ?? 'Anderson Marques Vieira',
+            'primeiro_nome' => $_ENV['LABEL_MOCK_PRIMEIRO_NOME'] ?? 'ANDERSON',
+            'pacote' => $_ENV['LABEL_MOCK_PACOTE'] ?? 'Experiencia Entao e Natal',
+            'data' => $_ENV['LABEL_MOCK_DATA'] ?? '25/09/25',
+            'whats' => $_ENV['LABEL_MOCK_WHATS'] ?? '48996425287',
+            'id' => $_ENV['LABEL_MOCK_ID'] ?? '1515',
+        ],
+    ],
     'cors' => [
         'allowed_origins' => array_filter(array_map('trim', explode(',', $_ENV['CORS_ALLOWED_ORIGINS'] ?? '*'))),
         'allowed_methods' => array_filter(array_map('trim', explode(',', $_ENV['CORS_ALLOWED_METHODS'] ?? 'GET,POST,PUT,PATCH,DELETE,OPTIONS'))),
@@ -74,5 +113,6 @@ return [
         ),
     ],
 ];
+
 
 
