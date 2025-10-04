@@ -1,3 +1,3539 @@
 {
-    "openapi": "3.0.0"
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Evydencia API",
+        "description": "HTTP interface for Evydencia platform. Documentation generated with swagger-php.",
+        "termsOfService": "https://evydencia.com/terms",
+        "contact": {
+            "name": "Evydencia Platform",
+            "email": "devs@evydencia.com"
+        },
+        "license": {
+            "name": "Proprietary",
+            "url": "https://evydencia.com/license"
+        },
+        "version": "1.1.0"
+    },
+    "servers": [
+        {
+            "url": "https://api.evydencia.com/v1",
+            "description": "Production cluster"
+        },
+        {
+            "url": "https://staging-api.evydencia.com/v1",
+            "description": "Staging mirror for QA and partners"
+        },
+        {
+            "url": "http://localhost:8080/v1",
+            "description": "Local sandbox via Docker or Sail"
+        }
+    ],
+    "paths": {
+        "/v1/blacklist": {
+            "get": {
+                "tags": [
+                    "Blacklist"
+                ],
+                "summary": "Lista contatos bloqueados",
+                "description": "Retorna a lista paginada de contatos bloqueados no CRM/WhatsApp, com suporte a filtros e cache condicional.",
+                "operationId": "a044ac8741fb3b1d276c6bedb1be3caf",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Página atual (>=1)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Tamanho da página (1-200)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 50,
+                            "maximum": 200,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "fetch",
+                        "in": "query",
+                        "description": "Use 'all' para retornar todos os registros em uma única página.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "all"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "description": "Busca textual por nome ou WhatsApp.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "sort",
+                        "in": "query",
+                        "description": "Ordenação ex.: '-created_at,name'.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "fields",
+                        "in": "query",
+                        "description": "Campos opcionais (ex.: fields=id,name ou fields[blacklist]=id,name).",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "filter[whatsapp]",
+                        "in": "query",
+                        "description": "Filtra por WhatsApp (apenas dígitos).",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "filter[name]",
+                        "in": "query",
+                        "description": "Filtra por nome (exato ou parcial).",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "filter[has_closed_order]",
+                        "in": "query",
+                        "description": "Filtra por clientes com pedido fechado.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "name": "filter[created_at][gte]",
+                        "in": "query",
+                        "description": "Data inicial (YYYY-MM-DD).",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "filter[created_at][lte]",
+                        "in": "query",
+                        "description": "Data final (YYYY-MM-DD).",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "If-None-Match",
+                        "in": "header",
+                        "description": "Valor de ETag para cache condicional.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Lista paginada",
+                        "headers": {
+                            "X-Total-Count": {
+                                "description": "Total de registros encontrados.",
+                                "schema": {
+                                    "type": "integer"
+                                }
+                            },
+                            "ETag": {
+                                "description": "Hash da versão da lista.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BlacklistListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "304": {
+                        "description": "Conteúdo não modificado"
+                    },
+                    "401": {
+                        "description": "Não autorizado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parâmetros inválidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Blacklist"
+                ],
+                "summary": "Cria um contato bloqueado",
+                "operationId": "4e8533615c620fa970982dc93e6aa95c",
+                "parameters": [
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "description": "Chave para garantir idempotência por 24h.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BlacklistCreatePayload"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Registro criado",
+                        "headers": {
+                            "Location": {
+                                "description": "URL do recurso recém-criado.",
+                                "schema": {
+                                    "type": "string",
+                                    "format": "uri"
+                                }
+                            },
+                            "X-Request-Id": {
+                                "description": "Trace ID da requisição.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BlacklistResourceResponse"
+                                }
+                            }
+                        }
+                    },
+                    "200": {
+                        "description": "Registro já existia e foi retornado (idempotência)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BlacklistResourceResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflito (WhatsApp duplicado)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parâmetros inválidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/blacklist/{id}": {
+            "get": {
+                "tags": [
+                    "Blacklist"
+                ],
+                "summary": "Consulta um contato bloqueado",
+                "operationId": "29c7468929635f062f10bc6178f7f5d6",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Identificador numérico do registro.",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Registro localizado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BlacklistResourceResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Registro não encontrado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Identificador inválido",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "Blacklist"
+                ],
+                "summary": "Atualiza totalmente um contato bloqueado",
+                "operationId": "73c508a876a7adbbb18f090ce223ecac",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Identificador do registro.",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BlacklistUpdatePayload"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Registro atualizado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BlacklistResourceResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Registro não encontrado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflito de dados",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parâmetros inválidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "Blacklist"
+                ],
+                "summary": "Remove um contato da blacklist",
+                "operationId": "85743fd33623e60df5cd30bd0663bdd4",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Operação concluída",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/SuccessEnvelope"
+                                        },
+                                        {
+                                            "properties": {
+                                                "data": {
+                                                    "properties": {
+                                                        "deleted": {
+                                                            "type": "boolean",
+                                                            "example": true
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Registro não encontrado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Identificador inválido",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "tags": [
+                    "Blacklist"
+                ],
+                "summary": "Atualiza parcialmente um contato bloqueado",
+                "operationId": "8918ba4bc404d9cfdcfe31493a33fc6f",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BlacklistUpdatePayload"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Registro atualizado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BlacklistResourceResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Registro não encontrado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflito de dados",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parâmetros inválidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/campaigns/schedule/{id}/abort": {
+            "post": {
+                "tags": [
+                    "Campaigns"
+                ],
+                "summary": "Aborta uma campanha agendada",
+                "operationId": "c3eaa43a71a3ac38bc3c4c6e8b903b5a",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Identificador da agenda.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Campanha abortada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GenericResourceResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parâmetros inválidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Erro no CRM",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/campaigns/schedule": {
+            "get": {
+                "tags": [
+                    "Campaigns"
+                ],
+                "summary": "Lista campanhas agendadas",
+                "operationId": "a5c6d5540f45821fb3e653ff2fe2a036",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 50,
+                            "maximum": 200,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "fetch",
+                        "in": "query",
+                        "description": "Use 'all' para buscar todas as páginas.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "all"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Filtra por status (scheduled, running, finished).",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "start_at",
+                        "in": "query",
+                        "description": "Data mínima (YYYY-MM-DD).",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "finish_at",
+                        "in": "query",
+                        "description": "Data máxima (YYYY-MM-DD).",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Lista de agendamentos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CampaignScheduleListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parâmetros inválidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Erro no CRM",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/campaigns/schedule/execute": {
+            "post": {
+                "tags": [
+                    "Campaigns"
+                ],
+                "summary": "Agenda uma nova campanha",
+                "operationId": "86f110b03df21109e037c3b63aa52db5",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CampaignSchedulePayload"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Campanha agendada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GenericResourceResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parâmetros inválidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Erro no CRM",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Verifica disponibilidade da API",
+                "description": "Retorna o status atual da API e um identificador de rastreamento.",
+                "operationId": "ef102c44930733b92dd87850db3f76ed",
+                "responses": {
+                    "200": {
+                        "description": "Serviço operacional",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/SuccessEnvelope"
+                                        },
+                                        {
+                                            "properties": {
+                                                "data": {
+                                                    "properties": {
+                                                        "status": {
+                                                            "type": "string",
+                                                            "example": "ok"
+                                                        },
+                                                        "timestamp": {
+                                                            "type": "string",
+                                                            "format": "date-time",
+                                                            "example": "2025-10-03T18:20:00Z"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": []
+            }
+        },
+        "/v1/orders/{uuid}": {
+            "get": {
+                "tags": [
+                    "Orders"
+                ],
+                "summary": "Obtém detalhes do pedido",
+                "operationId": "826f0d40149ad318a378e26504d6c839",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Identificador do pedido no CRM.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Pedido localizado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GenericResourceResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Pedido não encontrado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Erro ao consultar CRM",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/orders/search": {
+            "get": {
+                "tags": [
+                    "Orders"
+                ],
+                "summary": "Pesquisa pedidos no CRM",
+                "description": "Consulta a API do CRM com filtros, paginação e ordenação, retornando os pedidos enriquecidos com dados locais.",
+                "operationId": "8723b6aa8cd98c1a76c8795d07a3ceb8",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 50,
+                            "maximum": 200,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "fetch",
+                        "in": "query",
+                        "description": "Use 'all' para buscar várias páginas do CRM.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "all"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "sort",
+                        "in": "query",
+                        "description": "Ordenação (ex.: '-created_at,status').",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "fields[orders]",
+                        "in": "query",
+                        "description": "Projeção de campos (ex.: uuid,status,total).",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "description": "Termo livre para busca textual.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "order[status]",
+                        "in": "query",
+                        "description": "Filtra por status ex.: paid, canceled.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "order[created-start]",
+                        "in": "query",
+                        "description": "Data inicial (YYYY-MM-DD).",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "order[created-end]",
+                        "in": "query",
+                        "description": "Data final (YYYY-MM-DD).",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "customer[email]",
+                        "in": "query",
+                        "description": "E-mail do cliente.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "email"
+                        }
+                    },
+                    {
+                        "name": "customer[whatsapp]",
+                        "in": "query",
+                        "description": "WhatsApp do cliente (apenas dígitos).",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "product[uuid]",
+                        "in": "query",
+                        "description": "Produto vinculado.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Pedidos encontrados",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GenericListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parâmetros inválidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Erro ao contatar CRM",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/orders/{uuid}/status": {
+            "put": {
+                "tags": [
+                    "Orders"
+                ],
+                "summary": "Atualiza o status do pedido no CRM",
+                "operationId": "c0f9115a1e4c7f5b3130affcdf6e547f",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Identificador do pedido.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OrderStatusUpdatePayload"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Status atualizado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GenericResourceResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parâmetros inválidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Erro ao consultar CRM",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/reports/{key}/export": {
+            "post": {
+                "tags": [
+                    "Reports"
+                ],
+                "summary": "Exporta um relatório em CSV ou JSON",
+                "operationId": "fb4fb573fc0a59c55667252be237e2bd",
+                "parameters": [
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "description": "Identificador do relatório.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "format",
+                        "in": "query",
+                        "description": "Formato desejado (csv ou json).",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "csv",
+                            "enum": [
+                                "csv",
+                                "json"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Arquivo gerado",
+                        "content": {
+                            "text/csv": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parâmetros inválidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Erro no CRM",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/reports": {
+            "get": {
+                "tags": [
+                    "Reports"
+                ],
+                "summary": "Lista relatórios disponíveis",
+                "operationId": "94ab1377b27fb6467b89f48124e82432",
+                "responses": {
+                    "200": {
+                        "description": "Coleção de relatórios",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/ReportDefinition"
+                                            }
+                                        },
+                                        "summary": {
+                                            "properties": {
+                                                "count": {
+                                                    "type": "integer",
+                                                    "example": 3
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "additionalProperties": true
+                                        },
+                                        "links": {
+                                            "type": "object",
+                                            "additionalProperties": true
+                                        },
+                                        "trace_id": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/reports/{key}": {
+            "get": {
+                "tags": [
+                    "Reports"
+                ],
+                "summary": "Executa um relatório",
+                "operationId": "8502b40468c94436300596ede355add8",
+                "parameters": [
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "description": "Identificador do relatório.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 50,
+                            "maximum": 500,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "sort",
+                        "in": "query",
+                        "description": "Ordenação dinâmica (ex.: '-created_at').",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "_cache_enabled",
+                        "in": "query",
+                        "description": "Define se o cache deve ser usado (true/false).",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Execução bem-sucedida",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportRunPayload"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parâmetros inválidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Erro no CRM ou fonte externa",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/scheduled-posts": {
+            "get": {
+                "tags": [
+                    "ScheduledPosts"
+                ],
+                "summary": "Lista agendamentos de disparos",
+                "operationId": "52ef1464b51b056817644bca91323c4d",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Página atual (>=1)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Itens por página (1-200)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 50,
+                            "maximum": 200,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "fetch",
+                        "in": "query",
+                        "description": "Use 'all' para retornar todos os itens de uma vez.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "all"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "description": "Busca por mensagem/caption.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "sort",
+                        "in": "query",
+                        "description": "Ordenação ex.: 'scheduled_datetime,-id'",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "fields",
+                        "in": "query",
+                        "description": "Campos desejados (ex.: fields=id,type).",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "filter[type]",
+                        "in": "query",
+                        "description": "Filtra por tipo (text,image,video).",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "text",
+                                "image",
+                                "video"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "filter[scheduled_datetime][gte]",
+                        "in": "query",
+                        "description": "Data inicial (YYYY-MM-DD HH:MM:SS).",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "filter[scheduled_datetime][lte]",
+                        "in": "query",
+                        "description": "Data final (YYYY-MM-DD HH:MM:SS).",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "filter[message_id_state]",
+                        "in": "query",
+                        "description": "Filtra por entregues (not_null) ou pendentes (null).",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "null",
+                                "not_null"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "If-None-Match",
+                        "in": "header",
+                        "description": "Cache condicional via ETag.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Lista paginada",
+                        "headers": {
+                            "X-Total-Count": {
+                                "description": "Total de registros.",
+                                "schema": {
+                                    "type": "integer"
+                                }
+                            },
+                            "ETag": {
+                                "description": "Hash da versão da lista.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ScheduledPostListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "304": {
+                        "description": "Conteúdo não modificado"
+                    },
+                    "422": {
+                        "description": "Parâmetros inválidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "ScheduledPosts"
+                ],
+                "summary": "Cria um novo agendamento",
+                "operationId": "de272c92285819c9b3dc6bb95b1e034a",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ScheduledPostCreatePayload"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Agendamento criado",
+                        "headers": {
+                            "Location": {
+                                "description": "URL do recurso criado.",
+                                "schema": {
+                                    "type": "string",
+                                    "format": "uri"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ScheduledPostResourceResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parâmetros inválidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/scheduled-posts/{id}": {
+            "get": {
+                "tags": [
+                    "ScheduledPosts"
+                ],
+                "summary": "Busca um agendamento específico",
+                "operationId": "66de6d202d62dd79fbb3efd9ba68cf11",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Registro encontrado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ScheduledPostResourceResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Registro não encontrado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Identificador inválido",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "ScheduledPosts"
+                ],
+                "summary": "Atualiza um agendamento",
+                "operationId": "bee3343fd2146dfa5c7d73050ac246eb",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ScheduledPostUpdatePayload"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Registro atualizado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ScheduledPostResourceResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Registro não encontrado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parâmetros inválidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "ScheduledPosts"
+                ],
+                "summary": "Remove um agendamento",
+                "operationId": "4820eb79760cb9f21a976c695069fc01",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Operação concluída",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/SuccessEnvelope"
+                                        },
+                                        {
+                                            "properties": {
+                                                "data": {
+                                                    "properties": {
+                                                        "deleted": {
+                                                            "type": "boolean",
+                                                            "example": true
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Registro não encontrado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Identificador inválido",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "tags": [
+                    "ScheduledPosts"
+                ],
+                "summary": "Atualiza parcialmente um agendamento",
+                "operationId": "38a6b728dc7ed771604883488dca14a3",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ScheduledPostUpdatePayload"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Registro atualizado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ScheduledPostResourceResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Registro não encontrado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parâmetros inválidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/scheduled-posts/ready": {
+            "get": {
+                "tags": [
+                    "ScheduledPosts"
+                ],
+                "summary": "Retorna agendamentos prontos para envio",
+                "operationId": "27b8a96b2ce18e1b10f8fc1770f26473",
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "description": "Limite de itens retornados (padrão 50).",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 50,
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Lista de agendamentos prontos",
+                        "headers": {
+                            "X-Total-Count": {
+                                "description": "Total retornado.",
+                                "schema": {
+                                    "type": "integer"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ScheduledPostListResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/scheduled-posts/{id}/mark-sent": {
+            "post": {
+                "tags": [
+                    "ScheduledPosts"
+                ],
+                "summary": "Marca um agendamento como enviado",
+                "operationId": "908efdc6970a153be66fd1a7eecb8e5b",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MarkScheduledPostSentPayload"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Registro atualizado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ScheduledPostResourceResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Registro não encontrado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parâmetros inválidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/whatsapp/audio": {
+            "post": {
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Envia áudio pelo WhatsApp",
+                "operationId": "452f83d4eef5a616219509b967935491",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/WhatsAppAudioPayload"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Mensagem aceita",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WhatsAppSendResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parâmetros inválidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Falha no provedor Z-API",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/whatsapp/document": {
+            "post": {
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Envia documento pelo WhatsApp",
+                "operationId": "eb94c5e367f9fcb4878e4ecba02ed358",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/WhatsAppDocumentPayload"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Mensagem aceita",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WhatsAppSendResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parâmetros inválidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Falha no provedor Z-API",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/whatsapp/image": {
+            "post": {
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Envia imagem pelo WhatsApp",
+                "operationId": "05cfa0ef322e7741f03a7a2ab88f0e41",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/WhatsAppImagePayload"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Mensagem aceita",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WhatsAppSendResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parâmetros inválidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Falha no provedor Z-API",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/whatsapp/status/image": {
+            "post": {
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Envia imagem no status",
+                "operationId": "55ef5501ca83095b80c1f0b93fa42b56",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/WhatsAppStatusImagePayload"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Status publicado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WhatsAppSendResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parâmetros inválidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Falha no provedor Z-API",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/whatsapp/text": {
+            "post": {
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Envia mensagem de texto via Z-API",
+                "operationId": "690545940ca0002d4db44609d6689680",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/WhatsAppTextPayload"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Mensagem aceita pelo provedor",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WhatsAppSendResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parâmetros inválidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Falha no provedor Z-API",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/whatsapp/status/video": {
+            "post": {
+                "tags": [
+                    "WhatsApp"
+                ],
+                "summary": "Envia vídeo no status",
+                "operationId": "3fd09db994eb9b3eb77622c7655180a7",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/WhatsAppStatusVideoPayload"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Status publicado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WhatsAppSendResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parâmetros inválidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Falha no provedor Z-API",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "PaginationMeta": {
+                "description": "Metadados de paginaÃ§Ã£o e telemetria.",
+                "properties": {
+                    "page": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "per_page": {
+                        "type": "integer",
+                        "example": 50,
+                        "nullable": true
+                    },
+                    "total": {
+                        "type": "integer",
+                        "example": 120,
+                        "nullable": true
+                    },
+                    "count": {
+                        "type": "integer",
+                        "example": 50,
+                        "nullable": true
+                    },
+                    "total_pages": {
+                        "type": "integer",
+                        "example": 3,
+                        "nullable": true
+                    },
+                    "source": {
+                        "type": "string",
+                        "example": "api"
+                    },
+                    "elapsed_ms": {
+                        "type": "integer",
+                        "example": 42,
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "StandardLinks": {
+                "properties": {
+                    "self": {
+                        "type": "string",
+                        "format": "uri",
+                        "example": "https://api.evydencia.com/v1/resource"
+                    },
+                    "next": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true
+                    },
+                    "prev": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "ErrorDetail": {
+                "properties": {
+                    "field": {
+                        "type": "string",
+                        "example": "status"
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Valor invÃ¡lido."
+                    },
+                    "code": {
+                        "type": "string",
+                        "example": "validation_error",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "Error": {
+                "required": [
+                    "code",
+                    "message"
+                ],
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "example": "unprocessable_entity"
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Parametros invalidos."
+                    },
+                    "details": {
+                        "type": "object",
+                        "example": {
+                            "provider_status": 502,
+                            "provider_response": "Timeout while calling upstream"
+                        },
+                        "nullable": true
+                    },
+                    "errors": {
+                        "description": "Lista opcional com erros de validacao por campo.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ErrorDetail"
+                        },
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "ErrorEnvelope": {
+                "required": [
+                    "success",
+                    "error",
+                    "trace_id"
+                ],
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "error": {
+                        "$ref": "#/components/schemas/Error"
+                    },
+                    "trace_id": {
+                        "type": "string",
+                        "example": "a1b2c3d4e5f6a7b8"
+                    },
+                    "meta": {
+                        "description": "Contexto opcional sobre a falha",
+                        "properties": {
+                            "timestamp": {
+                                "type": "string",
+                                "format": "date-time",
+                                "example": "2025-10-03T18:20:00Z"
+                            },
+                            "correlation_id": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "type": "object",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "SuccessEnvelope": {
+                "required": [
+                    "success",
+                    "data",
+                    "meta",
+                    "links",
+                    "trace_id"
+                ],
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "meta": {
+                        "$ref": "#/components/schemas/PaginationMeta"
+                    },
+                    "links": {
+                        "$ref": "#/components/schemas/StandardLinks"
+                    },
+                    "trace_id": {
+                        "type": "string",
+                        "example": "a1b2c3d4e5f6a7b8"
+                    },
+                    "data": {
+                        "description": "Carga Ãºtil da resposta",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "OrderStatusUpdatePayload": {
+                "required": [
+                    "status"
+                ],
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "example": "paid"
+                    },
+                    "note": {
+                        "type": "string",
+                        "example": "Atualizado manualmente",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "GenericRecord": {
+                "description": "Objeto flexÃ­vel com chaves dinÃ¢micas.",
+                "type": "object",
+                "additionalProperties": true
+            },
+            "BlacklistCreatePayload": {
+                "required": [
+                    "name",
+                    "whatsapp"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "example": "Cliente Bloqueado"
+                    },
+                    "whatsapp": {
+                        "type": "string",
+                        "example": "5511999999999"
+                    },
+                    "has_closed_order": {
+                        "description": "Marca se o contato possui pedido fechado.",
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "observation": {
+                        "type": "string",
+                        "example": "Observaï¿½ï¿½o opcional",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "BlacklistUpdatePayload": {
+                "description": "Campos parciais para atualizar um registro da blacklist.",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "whatsapp": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "has_closed_order": {
+                        "type": "boolean",
+                        "nullable": true
+                    },
+                    "observation": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "BlacklistResource": {
+                "required": [
+                    "id",
+                    "name",
+                    "whatsapp",
+                    "has_closed_order"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Cliente Bloqueado"
+                    },
+                    "whatsapp": {
+                        "type": "string",
+                        "example": "5511999999999"
+                    },
+                    "has_closed_order": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "observation": {
+                        "type": "string",
+                        "example": "Chargeback em 2023",
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2025-10-03T12:00:00Z"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2025-10-04T09:15:00Z"
+                    }
+                },
+                "type": "object"
+            },
+            "ScheduledPostCreatePayload": {
+                "required": [
+                    "type",
+                    "scheduled_datetime"
+                ],
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "text",
+                            "image",
+                            "video"
+                        ],
+                        "example": "text"
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Mensagem programada",
+                        "nullable": true
+                    },
+                    "image_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true
+                    },
+                    "video_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true
+                    },
+                    "caption": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "scheduled_datetime": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2025-10-03T15:30:00-03:00"
+                    },
+                    "zaapId": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "messageId": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "ScheduledPostUpdatePayload": {
+                "description": "Campos parciais para atualizar um agendamento.",
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "text",
+                            "image",
+                            "video"
+                        ],
+                        "nullable": true
+                    },
+                    "message": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "image_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true
+                    },
+                    "video_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true
+                    },
+                    "caption": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "scheduled_datetime": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "zaapId": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "messageId": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "MarkScheduledPostSentPayload": {
+                "required": [
+                    "messageId"
+                ],
+                "properties": {
+                    "messageId": {
+                        "type": "string",
+                        "example": "wamid.HBgM..."
+                    },
+                    "zaapId": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "ScheduledPostResource": {
+                "required": [
+                    "id",
+                    "type",
+                    "scheduled_datetime"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 321
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "text",
+                            "image",
+                            "video"
+                        ],
+                        "example": "text"
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Mensagem programada",
+                        "nullable": true
+                    },
+                    "image_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true
+                    },
+                    "video_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true
+                    },
+                    "caption": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "scheduled_datetime": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2025-10-03T15:30:00-03:00"
+                    },
+                    "zaapId": {
+                        "type": "string",
+                        "example": "ZP-123",
+                        "nullable": true
+                    },
+                    "messageId": {
+                        "type": "string",
+                        "example": "MSG-456",
+                        "nullable": true
+                    },
+                    "has_media": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "WhatsAppTextPayload": {
+                "required": [
+                    "phone",
+                    "message"
+                ],
+                "properties": {
+                    "phone": {
+                        "type": "string",
+                        "example": "5511999999999"
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Olï¿½, tudo bem?"
+                    }
+                },
+                "type": "object"
+            },
+            "WhatsAppAudioPayload": {
+                "required": [
+                    "phone",
+                    "audio"
+                ],
+                "properties": {
+                    "phone": {
+                        "type": "string"
+                    },
+                    "audio": {
+                        "description": "Base64 ou URL pï¿½blica do ï¿½udio.",
+                        "type": "string"
+                    },
+                    "delayMessage": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "delayTyping": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "viewOnce": {
+                        "type": "boolean",
+                        "nullable": true
+                    },
+                    "async": {
+                        "type": "boolean",
+                        "nullable": true
+                    },
+                    "waveform": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "WhatsAppImagePayload": {
+                "required": [
+                    "phone",
+                    "image"
+                ],
+                "properties": {
+                    "phone": {
+                        "type": "string"
+                    },
+                    "image": {
+                        "description": "Base64 ou URL pï¿½blica da imagem.",
+                        "type": "string"
+                    },
+                    "caption": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "messageId": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "delayMessage": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "viewOnce": {
+                        "type": "boolean",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "WhatsAppDocumentPayload": {
+                "required": [
+                    "phone",
+                    "extension",
+                    "document"
+                ],
+                "properties": {
+                    "phone": {
+                        "type": "string"
+                    },
+                    "extension": {
+                        "type": "string",
+                        "example": "pdf"
+                    },
+                    "document": {
+                        "description": "Base64 ou URL pï¿½blica do arquivo.",
+                        "type": "string"
+                    },
+                    "fileName": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "caption": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "messageId": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "delayMessage": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "editDocumentMessageId": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "WhatsAppStatusImagePayload": {
+                "required": [
+                    "image"
+                ],
+                "properties": {
+                    "image": {
+                        "description": "Base64 ou URL da imagem.",
+                        "type": "string"
+                    },
+                    "caption": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "WhatsAppStatusVideoPayload": {
+                "required": [
+                    "video"
+                ],
+                "properties": {
+                    "video": {
+                        "description": "Base64 ou URL do vï¿½deo.",
+                        "type": "string"
+                    },
+                    "caption": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "WhatsAppSendResult": {
+                "description": "Identificadores retornados pelo provedor Z-API.",
+                "properties": {
+                    "zaapId": {
+                        "type": "string",
+                        "example": "zaap-123456",
+                        "nullable": true
+                    },
+                    "messageId": {
+                        "type": "string",
+                        "example": "wamid.HBgMNTU5...",
+                        "nullable": true
+                    }
+                },
+                "type": "object",
+                "additionalProperties": true
+            },
+            "ReportDefinition": {
+                "required": [
+                    "key",
+                    "title"
+                ],
+                "properties": {
+                    "key": {
+                        "type": "string",
+                        "example": "orders-by-status"
+                    },
+                    "title": {
+                        "type": "string",
+                        "example": "Pedidos por status"
+                    },
+                    "description": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "columns": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "params": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "ReportRunPayload": {
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/GenericRecord"
+                        }
+                    },
+                    "summary": {
+                        "type": "object",
+                        "additionalProperties": true
+                    },
+                    "meta": {
+                        "type": "object",
+                        "additionalProperties": true
+                    },
+                    "columns": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "links": {
+                        "$ref": "#/components/schemas/StandardLinks"
+                    },
+                    "trace_id": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "CampaignSchedulePayload": {
+                "required": [
+                    "campaign",
+                    "start_at"
+                ],
+                "properties": {
+                    "campaign": {
+                        "type": "integer",
+                        "example": 1234
+                    },
+                    "start_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2025-10-03T15:30:00-03:00"
+                    },
+                    "finish_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "contacts": {
+                        "description": "Lista de contatos (nï¿½meros ou e-mails).",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "use_leads_system": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "instance": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "order": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "customer": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "product": {
+                        "properties": {
+                            "uuid": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "reference": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "slug": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "name": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "type": "object",
+                        "nullable": true
+                    },
+                    "type": {
+                        "type": "string",
+                        "example": "campaign"
+                    }
+                },
+                "type": "object"
+            },
+            "CampaignScheduleItem": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "example": "cmp-123"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Campanha Outubro"
+                    },
+                    "status": {
+                        "type": "string",
+                        "example": "scheduled"
+                    },
+                    "scheduled_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object",
+                "additionalProperties": true
+            },
+            "CampaignScheduleListResponse": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/SuccessEnvelope"
+                    },
+                    {
+                        "properties": {
+                            "data": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/CampaignScheduleItem"
+                                }
+                            }
+                        },
+                        "type": "object"
+                    }
+                ]
+            },
+            "BlacklistListResponse": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/SuccessEnvelope"
+                    },
+                    {
+                        "properties": {
+                            "data": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/BlacklistResource"
+                                }
+                            }
+                        },
+                        "type": "object"
+                    }
+                ]
+            },
+            "BlacklistResourceResponse": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/SuccessEnvelope"
+                    },
+                    {
+                        "properties": {
+                            "data": {
+                                "$ref": "#/components/schemas/BlacklistResource"
+                            }
+                        },
+                        "type": "object"
+                    }
+                ]
+            },
+            "ScheduledPostListResponse": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/SuccessEnvelope"
+                    },
+                    {
+                        "properties": {
+                            "data": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/ScheduledPostResource"
+                                }
+                            }
+                        },
+                        "type": "object"
+                    }
+                ]
+            },
+            "ScheduledPostResourceResponse": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/SuccessEnvelope"
+                    },
+                    {
+                        "properties": {
+                            "data": {
+                                "$ref": "#/components/schemas/ScheduledPostResource"
+                            }
+                        },
+                        "type": "object"
+                    }
+                ]
+            },
+            "WhatsAppSendResponse": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/SuccessEnvelope"
+                    },
+                    {
+                        "properties": {
+                            "data": {
+                                "$ref": "#/components/schemas/WhatsAppSendResult"
+                            }
+                        },
+                        "type": "object"
+                    }
+                ]
+            },
+            "GenericListResponse": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/SuccessEnvelope"
+                    },
+                    {
+                        "properties": {
+                            "data": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/GenericRecord"
+                                }
+                            }
+                        },
+                        "type": "object"
+                    }
+                ]
+            },
+            "GenericResourceResponse": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/SuccessEnvelope"
+                    },
+                    {
+                        "properties": {
+                            "data": {
+                                "$ref": "#/components/schemas/GenericRecord"
+                            }
+                        },
+                        "type": "object"
+                    }
+                ]
+            }
+        },
+        "responses": {
+            "UnauthorizedError": {
+                "description": "Authentication required or token invalid.",
+                "headers": {
+                    "WWW-Authenticate": {
+                        "description": "Auth challenge details.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ErrorEnvelope"
+                        }
+                    }
+                }
+            },
+            "ForbiddenError": {
+                "description": "Caller lacks permission to perform the operation.",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ErrorEnvelope"
+                        }
+                    }
+                }
+            },
+            "ValidationError": {
+                "description": "Payload or query parameters failed validation.",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ErrorEnvelope"
+                        }
+                    }
+                }
+            },
+            "TooManyRequestsError": {
+                "description": "Rate limit exceeded.",
+                "headers": {
+                    "Retry-After": {
+                        "description": "Seconds until retry is allowed.",
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "example": 30
+                        }
+                    },
+                    "RateLimit-Limit": {
+                        "description": "Bucket limit.",
+                        "schema": {
+                            "type": "integer",
+                            "example": 120
+                        }
+                    },
+                    "RateLimit-Remaining": {
+                        "description": "Requests left in the current window.",
+                        "schema": {
+                            "type": "integer",
+                            "example": 0
+                        }
+                    }
+                },
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ErrorEnvelope"
+                        }
+                    }
+                }
+            },
+            "NotFoundError": {
+                "description": "Resource not found.",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ErrorEnvelope"
+                        }
+                    }
+                }
+            },
+            "BadGatewayError": {
+                "description": "Upstream integration failed.",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ErrorEnvelope"
+                        }
+                    }
+                }
+            },
+            "InternalServerError": {
+                "description": "Unexpected failure on Evydencia side.",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "parameters": {
+            "PageQuery": {
+                "name": "page",
+                "in": "query",
+                "description": "Page index starting at 1.",
+                "required": false,
+                "schema": {
+                    "type": "integer",
+                    "format": "int32",
+                    "default": 1,
+                    "minimum": 1
+                }
+            },
+            "PerPageQuery": {
+                "name": "per_page",
+                "in": "query",
+                "description": "Items per page (1-200).",
+                "required": false,
+                "schema": {
+                    "type": "integer",
+                    "format": "int32",
+                    "default": 50,
+                    "maximum": 200,
+                    "minimum": 1
+                }
+            },
+            "FetchStrategyQuery": {
+                "name": "fetch",
+                "in": "query",
+                "description": "Use value 'all' to fetch every page from the upstream CRM.",
+                "required": false,
+                "schema": {
+                    "type": "string",
+                    "enum": [
+                        "all"
+                    ]
+                }
+            },
+            "SortQuery": {
+                "name": "sort",
+                "in": "query",
+                "description": "Comma separated sort definition (ex.: '-created_at,status').",
+                "required": false,
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "IfNoneMatchHeader": {
+                "name": "If-None-Match",
+                "in": "header",
+                "description": "Provide a previously returned ETag to leverage conditional caching.",
+                "required": false,
+                "schema": {
+                    "type": "string"
+                }
+            },
+            "TraceIdHeader": {
+                "name": "Trace-Id",
+                "in": "header",
+                "description": "Optional trace identifier to correlate logs across services.",
+                "required": false,
+                "schema": {
+                    "type": "string",
+                    "example": "a1b2c3d4e5f6a7b8"
+                }
+            },
+            "AuthorizationHeader": {
+                "name": "Authorization",
+                "in": "header",
+                "description": "JWT bearer token issued by Evydencia Auth. Format: 'Bearer <token>'.",
+                "required": false,
+                "schema": {
+                    "type": "string",
+                    "example": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                }
+            }
+        },
+        "securitySchemes": {
+            "BearerAuth": {
+                "type": "http",
+                "description": "Send Authorization: Bearer {token}. Tokens are issued by Evydencia Auth service.",
+                "bearerFormat": "JWT",
+                "scheme": "bearer"
+            },
+            "ApiKeyLegacy": {
+                "type": "apiKey",
+                "description": "Legacy key header kept for backward compatibility.",
+                "name": "X-API-Key",
+                "in": "header"
+            }
+        }
+    },
+    "security": [
+        {
+            "BearerAuth": []
+        },
+        {
+            "ApiKeyLegacy": []
+        }
+    ],
+    "tags": [
+        {
+            "name": "Health",
+            "description": "Service status and platform uptime checks"
+        },
+        {
+            "name": "Blacklist",
+            "description": "Manage blocked WhatsApp contacts"
+        },
+        {
+            "name": "ScheduledPosts",
+            "description": "Plan and monitor scheduled outbound messages"
+        },
+        {
+            "name": "Orders",
+            "description": "CRM order search and lifecycle operations"
+        },
+        {
+            "name": "WhatsApp",
+            "description": "WhatsApp bridge powered by Z-API"
+        },
+        {
+            "name": "Reports",
+            "description": "Operational reports and exports"
+        },
+        {
+            "name": "Campaigns",
+            "description": "Campaign scheduling and orchestration"
+        }
+    ],
+    "externalDocs": {
+        "description": "Guides, SDKs and onboarding",
+        "url": "https://docs.evydencia.com"
+    }
 }

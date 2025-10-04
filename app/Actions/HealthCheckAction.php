@@ -31,7 +31,7 @@ final class HealthCheckAction
      *                         @OA\Property(property="timestamp", type="string", format="date-time", example="2025-10-03T18:20:00Z")
      *                     )
      *                 )
-     *             ]
+     *             }
      *         )
      *     ),
      *     @OA\Response(

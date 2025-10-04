@@ -306,22 +306,27 @@ use OpenApi\Annotations as OA;
  *
  *
  * @OA\Schema(
- *     schema="CampaignScheduleItem" *
- * @OA\Schema(
- *     schema="CampaignScheduleListResponse",
- *     allOf={
- *         @OA\Schema(ref="#/components/schemas/SuccessEnvelope"),
- *         @OA\Schema(@OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/CampaignScheduleItem")))
- *     }
- * )
- *
-,
+ *     schema="CampaignScheduleItem",
  *     type="object",
  *     @OA\Property(property="id", type="string", example="cmp-123"),
  *     @OA\Property(property="name", type="string", example="Campanha Outubro"),
  *     @OA\Property(property="status", type="string", example="scheduled"),
  *     @OA\Property(property="scheduled_at", type="string", format="date-time"),
  *     additionalProperties=true
+ * )
+ *
+ * @OA\Schema(
+ *     schema="CampaignScheduleListResponse",
+ *     allOf={
+ *         @OA\Schema(ref="#/components/schemas/SuccessEnvelope"),
+ *         @OA\Schema(
+ *             @OA\Property(
+ *                 property="data",
+ *                 type="array",
+ *                 @OA\Items(ref="#/components/schemas/CampaignScheduleItem")
+ *             )
+ *         )
+ *     }
  * )
  *
  * @OA\Schema(

@@ -41,7 +41,7 @@ final class DeleteBlacklistEntryAction
      *                         @OA\Property(property="deleted", type="boolean", example=true)
      *                     )
      *                 )
-     *             ]
+     *             }
      *         )
      *     ),
      *     @OA\Response(response=404, description="Registro não encontrado", @OA\JsonContent(ref="#/components/schemas/ErrorEnvelope")),

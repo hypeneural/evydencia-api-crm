@@ -12,8 +12,11 @@ API REST construída com Slim 4 e PHP-DI que expõe um conjunto de integrações
 - [Contrato de resposta](#contrato-de-resposta)
 - [Integração com o CRM Evydencia](#integração-com-o-crm-evydencia)
 - [Endpoints HTTP](#endpoints-http)
+  - [/doc](#doc)
   - [/health](#health)
   - [Recursos do CRM](#recursos-do-crm)
+  - [Relatorios dinamicos (CRM)](#relatorios-dinamicos-v1reports)
+  - [Campanhas (CRM)](#campanhas-v1campaigns)
   - [Blacklist de WhatsApp (recurso local)](#blacklist-de-whatsapp-recurso-local)
   - [Agendamentos de postagens (recurso local)](#agendamentos-de-postagens-recurso-local)
 - [WhatsApp (Z-API)](#whatsapp-z-api)
@@ -27,12 +30,14 @@ API REST construída com Slim 4 e PHP-DI que expõe um conjunto de integrações
 - **Autenticação por API Key** (`X-API-Key`) para todo o namespace `/v1/**`.
 - **Query DSL unificada** com aliases, filtros condicionais (`eq`, `like`, `gte`, `lte`), ordenação e projeção de campos.
 - **Integração com Evydencia CRM** via cliente Guzzle tipado, incluindo controle de tempo limite, headers automáticos e tratamento estruturado de erros.
+- **Relatorios dinamicos** (ReportEngine) com cache opcional (Redis), exportacao CSV/JSON e validacao por relatorio.
 - **Recursos locais** persistidos em MySQL: blacklist de WhatsApp e agendamentos de postagens.
 - **Integração WhatsApp (Z-API)** para envio de textos, áudios, imagens, documentos e status.
 - **Cache e ETag** para o listing de agendamentos, utilizando Redis opcionalmente.
 - **Idempotência** em `POST /v1/blacklist` via header `Idempotency-Key` para evitar duplicações por número de WhatsApp.
 - **Rate limiting** baseado em Redis (por IP + rota) com exposição dos headers `X-RateLimit-*`.
 - **Logs estruturados** (Monolog) registrando método, caminho, status, duração e `trace_id` em `var/logs/app.log`.
+- **Documentacao OpenAPI** acessível via `/doc`, gerada com `composer openapi:build` (Swagger UI + JSON).
 
 ## Arquitetura e organização
 
@@ -149,6 +154,14 @@ Com Laragon/Apache, aponte o DocumentRoot para `public/` e mantenha o `.htaccess
 
 ## Endpoints HTTP
 
+### /doc
+
+Serviço da documentação OpenAPI (Swagger UI + OpenAPI JSON).
+
+- **GET**: retorna `public/docs/index.html` carregando `public/openapi.json`.
+- Não exige autenticação e envia `Cache-Control: no-store, no-cache`.
+- Execute `composer openapi:build` após alterar Actions/Schemas para reconstruir os artefatos.
+
 ### /health
 
 | Método | Descrição                  | Auth | Body | Fonte |
@@ -157,49 +170,78 @@ Com Laragon/Apache, aponte o DocumentRoot para `public/` e mantenha o `.htaccess
 
 ### Recursos do CRM
 
-#### /v1/orders/search
+#### Pedidos (/v1/orders)
 
-- **GET**: proxy para busca de pedidos no CRM.
-- Autenticacao obrigatoria.
-- Aliases aceitos em `filter[...]` (mapeados para os parametros do CRM):
-  - `filter[order_id]` -> `order[id]`
-  - `filter[uuid]` -> `order[uuid]`
-  - `filter[status]` -> `order[status]`
-  - `filter[customer_id]`, `filter[customer_uuid]`, `filter[customer_email]`, `filter[customer_whatsapp]`, `filter[customer_document]`
-  - `filter[product_uuid]`, `filter[product_name]`, `filter[product_slug]`, `filter[product_ref]`
-  - `filter[created_at][gte|lte]`, `filter[session_at][gte|lte]`, `filter[selection_at][gte|lte]`
-  - `filter[customer_name][like]`
-- Parametros CRM aceitos diretamente (pass-through): `order[id]`, `order[uuid]`, `order[status]`, `order[created-start]`, `order[created-end]`, `order[session-start]`, `order[session-end]`, `order[selection-start]`, `order[selection-end]`, `customer[id]`, `customer[uuid]`, `customer[name]`, `customer[email]`, `customer[whatsapp]`, `customer[document]`, `product[uuid]`, `product[name]`, `product[slug]`, `product[reference]`.
-- Paginar com `page`/`per_page`, ordenar via `sort` (ex.: `sort=-created_at`), projetar campos com `fields[orders]=id,uuid,status`, utilizar `fetch=all` para coleta paginada e `q` para busca textual.
+**GET /v1/orders/search**
 
-#### /v1/orders/{uuid}
+- Proxy para busca de pedidos no CRM com mapeamento de filtros amigáveis para os parâmetros nativos (`order[...]`, `customer[...]`, `product[...]`).
+- Autenticação obrigatória via `X-API-Key`.
+- Aliases aceitos: `filter[order_id]`, `filter[uuid]`, `filter[status]`, `filter[customer_*]`, `filter[product_*]`, `filter[created_at][gte|lte]`, `filter[session_at][gte|lte]`, `filter[selection_at][gte|lte]`, `filter[customer_name][like]`.
+- Pass-through direto: `order[id|uuid|status|created-*|session-*|selection-*]`, `customer[...]`, `product[...]`, `include`, `fields[orders]`, `q`.
+- Suporta `page`/`per_page`, ordenação (`sort=-created_at`), projeção (`fields[orders]=uuid,status,total`), paginação automática (`fetch=all`) e `links` com URLs do CRM.
 
-- **GET**: detalhe de pedido (`/orders/{uuid}/detail` no CRM). Acrescenta `local_map` se houver dados no MySQL local.
+**GET /v1/orders/{uuid}**
 
-#### /v1/orders/{uuid}/status
+- Recupera o detalhe de um pedido (`/orders/{uuid}/detail` no CRM) e agrega `local_map` se existir mapeamento em MySQL.
 
-- **PUT**: atualiza status via CRM.
-- Body: `{ "status": "payment_confirmed", "note": "opcional" }`.
-- Valida tamanho de strings, persiste histórico no MySQL opcional (`orders_map`).
+**PUT /v1/orders/{uuid}/status**
 
-#### /v1/reports/sold-items
+- Atualiza status/notas no CRM.
+- Payload: `{ "status": "payment_confirmed", "note": "opcional" }` (strings validadas entre 1-255 caracteres).
+- Persiste histórico local na tabela `orders_map` para auditoria (`synced_at`, `data`).
 
-- **GET**: relatório de itens vendidos.
-- Filtros: `item_name`, `item_slug`, `item_ref`, `created_at[gte|lte]`, `fetch=all`, ordenação.
+#### Relatorios dinamicos (/v1/reports)
 
-#### /v1/campaigns/schedule
+**GET /v1/reports**
 
-- **GET**: agenda de campanhas no CRM.
-- Filtros: `campaign_id`, `contact_phone`, DSL de paginacao e ordenacao.
-- **POST** (`/v1/campaigns/schedule/execute`): agenda execucao de disparos no CRM.
-  - Campos obrigatorios: `campaign` (inteiro > 0), `start_at` (ISO 8601; respeita o timezone configurado e envia o valor ao CRM em UTC) e `contacts`.
-  - Formatos aceitos para `contacts`:
-    - string com linhas `dddnumero;Nome` separadas por `
-`;
-    - array de strings (cada item vira uma linha);
-    - array de hashes (as chaves formam o cabecalho `phone;name;coupon` e cada linha eh serializada como CSV com `;`).
-  - Campos opcionais: `finish_at` (mesmo formato de data, deve ser maior ou igual a `start_at`), `instance`, `use_leads_system`, `order`, `customer`, `product.reference`, `product.slug`. A chave legada `product.referecen` eh normalizada para `product.reference`.
-  - Datas sao enviadas como `YYYY-MM-DDTHH:MM:SSZ` e payloads invalidos retornam 422 com os erros de validacao.
+- Lista os relatórios configurados em `config/reports.php` com suas colunas e parâmetros esperados (`params`).
+
+**GET /v1/reports/{key}**
+
+- Executa o relatório definido pela chave (closures ou classes em `app/Application/Reports`).
+- Query params comuns: `page`, `per_page` (até 500), `sort`, `dir`, `_cache_enabled=false` para ignorar cache, `_cache_ttl=60` para sobrescrever TTL, `_fetch_all=true` para coletar todas as páginas do CRM quando suportado.
+- Retorna envelope com `data`, `summary`, `meta` (inclui `cache_hit`, `took_ms`, `source`), `columns` e `links.export_{csv,json}`.
+- Inclui header `X-Cache: HIT|MISS; key=<hash>` quando o cache Redis está habilitado.
+
+**POST /v1/reports/{key}/export**
+
+- Reaproveita os mesmos filtros do GET e gera arquivo.
+- Query `format=csv|json` (default `csv`).
+- Resposta `200` com `Content-Type` e `Content-Disposition` apropriados.
+
+| Chave | Título | Principais filtros | Observações |
+|-------|--------|--------------------|-------------|
+| `orders.missing_schedule` | Pedidos confirmados sem agendamento | `product[slug]`, `order[created-start]`, `order[created-end]` | Janela padrão 90 dias, inclui `uuid`, `customer_name`, `customer_whatsapp`, `product`, `created_at`.
+| `phones.for_campaign` | Telefones elegíveis para campanhas | `product[slug]`, `order[status]`, `format=plain` | Normaliza WhatsApp e remove duplicados; `summary.unique_numbers` exibe o total.
+| `orders.without_participants` | Pedidos sem participantes confirmados | `product[slug]`, `order[created-start]`, `order[created-end]` | Usa includes `participants,items,customer`; `summary.total` sinaliza itens retornados.
+| `orders.finalized_late_selections` | Seleções finalizadas há 10+ dias sem fechamento | `order[selection-start]`, `order[selection-end]`, `order[status]` | Calcula `days_since_selection` e média em `summary.avg_days_since_selection`.
+| `orders.not_closed` | Sessões confirmadas não fechadas | `order[session-start]`, `order[session-end]`, `order[status]` | Janela padrão últimos 30 dias; destaca `session_date`.
+| `participants.under_8` | Participantes com menos de 8 anos | `product[slug]`, `order[created-start]`, `order[created-end]` | Consolida idade a partir de `birthdate`; `summary.percent_under_8` resume o cenário.
+| `orders.presale_vs_current` | Comparativo pré-venda vs ano atual | `current_year`, `previous_year`, `current_start`, `current_end`, `previous_start`, `previous_end`, `product[slug]` | Varre até 10 páginas por período; resumo inclui receitas e contagem de pedidos por pacote.
+
+> Adicione novos relatórios editando `config/reports.php` (closures) ou criando classes que estendam `BaseReport` em `app/Application/Reports`.
+
+#### Campanhas (/v1/campaigns)
+
+**GET /v1/campaigns/schedule**
+
+- Consulta agenda de disparos no CRM (`campaigns/schedule/search`).
+- Filtros: `campaign_id` -> `campaign[id]`, `contact_phone` -> `contacts[phone]`. Parâmetros adicionais podem ser encaminhados na notação nativa do CRM (`campaign[status]`, `schedule[start_at]`, `schedule[finish_at]`, `contacts[segment]`, `q`).
+- Suporta `page`/`per_page`, `fetch=all`, `sort=campaign_id:asc` (formato `<campo>:<direção>`), e devolve `links` conforme CRM.
+
+**POST /v1/campaigns/schedule/execute**
+
+- Agenda uma nova campanha.
+- Campos obrigatórios: `campaign` (inteiro > 0), `start_at` (ISO 8601, convertido para UTC) e `contacts`.
+- Contatos aceitos como string (linhas `dddnumero;Nome`), array de strings ou array de objetos (monta CSV com cabeçalhos `phone;name;coupon`).
+- Campos opcionais: `finish_at` (>= `start_at`), `instance`, `use_leads_system`, `order`, `customer`, `product.reference`, `product.slug`; chave legada `product.referecen` é normalizada.
+- Números inteiros e datas são saneados pelo `CampaignSchedulePayloadNormalizer`, respeitando o fuso de `APP_TIMEZONE`.
+
+**POST /v1/campaigns/schedule/{id}/abort**
+
+- Aborta uma campanha agendada.
+- Requer apenas o `id` do agendamento no path; corpo vazio.
+- Retorna envelope de sucesso com os dados fornecidos pelo CRM e cabeçalho `X-Request-Id`.
 
 ### Blacklist de WhatsApp (recurso local)
 

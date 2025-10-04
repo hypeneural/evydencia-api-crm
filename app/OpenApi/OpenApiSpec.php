@@ -27,21 +27,23 @@ use OpenApi\Annotations as OA;
  *         url="http://localhost:8080/v1",
  *         description="Local sandbox via Docker or Sail"
  *     ),
- *     @OA\SecurityScheme(
- *         securityScheme="BearerAuth",
- *         type="http",
- *         scheme="bearer",
- *         bearerFormat="JWT",
- *         description="Send Authorization: Bearer {token}. Tokens are issued by Evydencia Auth service."
+ *     @OA\Components(
+ *         @OA\SecurityScheme(
+ *             securityScheme="BearerAuth",
+ *             type="http",
+ *             scheme="bearer",
+ *             bearerFormat="JWT",
+ *             description="Send Authorization: Bearer {token}. Tokens are issued by Evydencia Auth service."
+ *         ),
+ *         @OA\SecurityScheme(
+ *             securityScheme="ApiKeyLegacy",
+ *             type="apiKey",
+ *             in="header",
+ *             name="X-API-Key",
+ *             description="Legacy key header kept for backward compatibility."
+ *         )
  *     ),
- *     @OA\SecurityScheme(
- *         securityScheme="ApiKeyLegacy",
- *         type="apiKey",
- *         in="header",
- *         name="X-API-Key",
- *         description="Legacy key header kept for backward compatibility."
- *     ),
- *     @OA\SecurityRequirement(name="BearerAuth"),
+ *     security={{"BearerAuth": {}}, {"ApiKeyLegacy": {}}},
  *     @OA\Tag(name="Health", description="Service status and platform uptime checks"),
  *     @OA\Tag(name="Blacklist", description="Manage blocked WhatsApp contacts"),
  *     @OA\Tag(name="ScheduledPosts", description="Plan and monitor scheduled outbound messages"),
