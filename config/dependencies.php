@@ -199,6 +199,7 @@ return static function (ContainerBuilder $containerBuilder): void {
                 $container->get(QueryMapper::class),
                 $container->get('redis.client'),
                 $container->get(LoggerInterface::class),
+                $container->get('db.connection'),
                 __DIR__ . '/reports.php'
             );
         },
