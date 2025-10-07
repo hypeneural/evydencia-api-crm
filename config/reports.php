@@ -117,6 +117,360 @@ return [
             return new ReportResult($data, ['unique_numbers' => count($data)], $meta, ['whatsapp']);
         },
     ],
+    'orders.photos_ready' => [
+        'type' => 'closure',
+        'title' => 'Clientes com fotos prontas para retirada',
+        'description' => 'Lista pedidos com sessoes ja realizadas e com status que indicam fotos disponiveis para retirada.',
+        'cache' => 600,
+        'rules' => [
+            'product[slug]' => v::optional(v::stringType()->length(1, 64)),
+            'order[session-start]' => v::optional(v::date('Y-m-d')),
+            'order[session-end]' => v::optional(v::date('Y-m-d')),
+        ],
+        'defaults' => [
+            'product[slug]' => 'natal',
+            'order[session-end]' => (new DateTimeImmutable('today'))->format('Y-m-d'),
+            'include' => 'items,customer,status',
+        ],
+        'columns' => [
+            ['key' => 'id', 'label' => 'Pedido', 'type' => 'integer'],
+            ['key' => 'schedule_datetime', 'label' => 'Sessao (bruta)', 'type' => 'string'],
+            ['key' => 'schedule_1', 'label' => 'Sessao', 'type' => 'string'],
+            ['key' => 'schedule_time', 'label' => 'Horario', 'type' => 'string'],
+            ['key' => 'customer_first_name', 'label' => 'Primeiro Nome', 'type' => 'string'],
+            ['key' => 'customer_name', 'label' => 'Nome Completo', 'type' => 'string'],
+            ['key' => 'customer_whatsapp_plain', 'label' => 'WhatsApp (limpo)', 'type' => 'string'],
+            ['key' => 'customer_whatsapp_formatted', 'label' => 'WhatsApp (BR)', 'type' => 'string'],
+            ['key' => 'products', 'label' => 'Produtos', 'type' => 'string'],
+            ['key' => 'status_name', 'label' => 'Status', 'type' => 'string'],
+            ['key' => 'link', 'label' => 'Link', 'type' => 'string'],
+        ],
+        'sortable' => ['schedule_1', 'customer_name', 'customer_first_name', 'status_name'],
+        'runner' => static function (EvydenciaApiClient $api, array $input, string $traceId): ReportResult {
+            $page = max(1, (int) ($input['page'] ?? 1));
+            $perPage = max(1, min(500, (int) ($input['per_page'] ?? 100)));
+            $allowedSort = ['schedule_1', 'customer_name', 'customer_first_name', 'status_name'];
+            $sortField = isset($input['sort']) && is_string($input['sort']) && in_array($input['sort'], $allowedSort, true)
+                ? $input['sort']
+                : 'schedule_1';
+            $direction = strtolower((string) ($input['dir'] ?? 'asc')) === 'desc' ? 'desc' : 'asc';
+            $fetchAll = ($input['fetch'] ?? 'page') === 'all';
+
+            $filters = [];
+            foreach ($input as $key => $value) {
+                if (in_array($key, ['sort', 'dir', 'fetch', 'trace_id', 'page', 'per_page'], true)) {
+                    continue;
+                }
+                $filters[$key] = $value;
+            }
+
+            if (isset($filters['item[slug]']) && !isset($filters['product[slug]'])) {
+                $filters['product[slug]'] = $filters['item[slug]'];
+            }
+            unset($filters['item[slug]']);
+
+            if (!isset($filters['product[slug]']) || trim((string) $filters['product[slug]']) === '') {
+                $filters['product[slug]'] = 'natal';
+            }
+
+            if (!isset($filters['order[session-end]']) || trim((string) $filters['order[session-end]']) === '') {
+                $filters['order[session-end]'] = (new DateTimeImmutable('today'))->format('Y-m-d');
+            }
+
+            $includes = [];
+            if (isset($filters['include'])) {
+                $parts = array_map('trim', explode(',', (string) $filters['include']));
+                foreach ($parts as $part) {
+                    if ($part !== '') {
+                        $includes[$part] = true;
+                    }
+                }
+            }
+
+            foreach (['items', 'customer', 'status'] as $requiredInclude) {
+                $includes[$requiredInclude] = true;
+            }
+            $filters['include'] = implode(',', array_keys($includes));
+
+            $apiFilters = $filters;
+            $apiFilters['page'] = 1;
+            $apiFilters['per_page'] = min(200, max($perPage, 50));
+
+            $extractQuery = static function (string $link): array {
+                $components = parse_url($link);
+                if ($components === false || !isset($components['query'])) {
+                    return [];
+                }
+                parse_str($components['query'], $query);
+
+                return is_array($query) ? $query : [];
+            };
+
+            $statusWhitelist = [6, 9];
+            $orders = [];
+            $meta = [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => 0,
+                'count' => 0,
+                'cache_hit' => false,
+                'source' => 'crm',
+            ];
+
+            $maxIterations = 30;
+            $iteration = 0;
+
+            do {
+                $response = $api->searchOrders($apiFilters, $traceId);
+                $body = $response['body'] ?? [];
+                $batch = isset($body['data']) && is_array($body['data']) ? $body['data'] : [];
+
+                if ($batch === []) {
+                    break;
+                }
+
+                foreach ($batch as $order) {
+                    if (!is_array($order)) {
+                        continue;
+                    }
+
+                    $status = $order['status'] ?? null;
+                    $statusId = 0;
+                    if (is_array($status)) {
+                        $statusId = (int) ($status['id'] ?? 0);
+                    } else {
+                        $statusId = (int) ($order['status_id'] ?? $status ?? 0);
+                    }
+
+                    if (!in_array($statusId, $statusWhitelist, true)) {
+                        continue;
+                    }
+
+                    $orders[] = $order;
+                }
+
+                $links = $body['links'] ?? [];
+                $next = is_array($links) ? ($links['next'] ?? null) : null;
+
+                if (!is_string($next) || $next === '') {
+                    break;
+                }
+
+                $nextQuery = $extractQuery($next);
+                if ($nextQuery === []) {
+                    break;
+                }
+
+                $apiFilters = array_merge($apiFilters, $nextQuery);
+            } while (++$iteration < $maxIterations);
+
+            $formatSchedule = static function (?string $value): array {
+                if (!is_string($value) || trim($value) === '') {
+                    return [
+                        'date' => null,
+                        'time' => null,
+                        'iso' => null,
+                        'timestamp' => null,
+                    ];
+                }
+
+                try {
+                    $date = new DateTimeImmutable($value);
+                } catch (\Throwable) {
+                    return [
+                        'date' => $value,
+                        'time' => null,
+                        'iso' => $value,
+                        'timestamp' => null,
+                    ];
+                }
+
+                return [
+                    'date' => $date->format('d/m/y'),
+                    'time' => $date->format('H:i'),
+                    'iso' => $date->format('Y-m-d H:i:s'),
+                    'timestamp' => $date->getTimestamp(),
+                ];
+            };
+
+            $normalizePhone = static function (?string $value): ?string {
+                if (!is_string($value) || trim($value) === '') {
+                    return null;
+                }
+
+                $digits = preg_replace('/\D+/', '', $value) ?? '';
+                if ($digits === '') {
+                    return null;
+                }
+
+                if (str_starts_with($digits, '55') && strlen($digits) > 11) {
+                    $digits = substr($digits, 2);
+                }
+
+                while (strlen($digits) > 11) {
+                    $digits = substr($digits, -11);
+                }
+
+                return $digits;
+            };
+
+            $formatPhone = static function (?string $digits): ?string {
+                if ($digits === null || $digits === '') {
+                    return null;
+                }
+
+                $length = strlen($digits);
+
+                if ($length === 11) {
+                    return sprintf('+55 (%s) %s-%s', substr($digits, 0, 2), substr($digits, 2, 5), substr($digits, 7));
+                }
+
+                if ($length === 10) {
+                    return sprintf('+55 (%s) %s-%s', substr($digits, 0, 2), substr($digits, 2, 4), substr($digits, 6));
+                }
+
+                if ($length === 9) {
+                    return sprintf('%s-%s', substr($digits, 0, 5), substr($digits, 5));
+                }
+
+                if ($length === 8) {
+                    return sprintf('%s-%s', substr($digits, 0, 4), substr($digits, 4));
+                }
+
+                return $digits;
+            };
+
+            $extractFirstName = static function (?string $name): ?string {
+                if (!is_string($name)) {
+                    return null;
+                }
+
+                $trimmed = trim($name);
+                if ($trimmed === '') {
+                    return null;
+                }
+
+                $parts = preg_split('/\s+/', $trimmed);
+                if (!is_array($parts) || $parts === []) {
+                    return $trimmed;
+                }
+
+                return $parts[0] ?? $trimmed;
+            };
+
+            $collectProducts = static function (array $order): string {
+                $items = $order['items'] ?? [];
+                if (!is_array($items)) {
+                    return '';
+                }
+
+                $names = [];
+                foreach ($items as $item) {
+                    if (!is_array($item)) {
+                        continue;
+                    }
+                    $product = $item['product'] ?? [];
+                    $name = is_array($product) ? ($product['name'] ?? null) : null;
+                    if (is_string($name) && $name !== '') {
+                        $names[$name] = true;
+                    }
+                }
+
+                return implode(', ', array_keys($names));
+            };
+
+            $rows = array_map(static function (array $order) use ($formatSchedule, $normalizePhone, $formatPhone, $extractFirstName, $collectProducts): array {
+                $scheduleRaw = $order['schedule_1'] ?? ($order['schedule_one'] ?? null);
+                $schedule = $formatSchedule(is_string($scheduleRaw) ? $scheduleRaw : null);
+
+                $customer = $order['customer'] ?? [];
+                $customerName = is_array($customer) ? ($customer['name'] ?? '') : '';
+                $phoneRaw = is_array($customer) ? ($customer['whatsapp'] ?? null) : null;
+                $phonePlain = $normalizePhone(is_string($phoneRaw) ? $phoneRaw : null);
+
+                $status = $order['status'] ?? [];
+                $statusId = is_array($status) ? (int) ($status['id'] ?? 0) : (int) ($order['status_id'] ?? 0);
+                $statusName = is_array($status) ? (string) ($status['name'] ?? '') : (string) ($order['status_name'] ?? '');
+
+                $id = $order['id'] ?? null;
+                if ($id === null && isset($order['uuid'])) {
+                    $id = (string) $order['uuid'];
+                }
+
+                return [
+                    'id' => is_numeric($id) ? (int) $id : (string) $id,
+                    'schedule_datetime' => $schedule['iso'],
+                    'schedule_1' => $schedule['date'],
+                    'schedule_time' => $schedule['time'],
+                    'schedule_sort' => $schedule['timestamp'],
+                    'customer_first_name' => $extractFirstName($customerName),
+                    'customer_name' => $customerName,
+                    'customer_whatsapp_plain' => $phonePlain,
+                    'customer_whatsapp_formatted' => $formatPhone($phonePlain),
+                    'products' => $collectProducts($order),
+                    'status_name' => $statusName,
+                    'link' => $id === null ? null : sprintf('http://nossas.fotosdenatal.com/%s', $id),
+                ];
+            }, $orders);
+
+            $sortKey = match ($sortField) {
+                'customer_name' => 'customer_name',
+                'customer_first_name' => 'customer_first_name',
+                'status_name' => 'status_name',
+                default => 'schedule_sort',
+            };
+
+            usort($rows, static function (array $left, array $right) use ($sortKey, $direction): int {
+                $l = $left[$sortKey] ?? null;
+                $r = $right[$sortKey] ?? null;
+
+                if ($l === $r) {
+                    return 0;
+                }
+
+                if ($l === null) {
+                    return $direction === 'asc' ? 1 : -1;
+                }
+
+                if ($r === null) {
+                    return $direction === 'asc' ? -1 : 1;
+                }
+
+                if (is_numeric($l) && is_numeric($r)) {
+                    return $direction === 'asc' ? ($l <=> $r) : ($r <=> $l);
+                }
+
+                return $direction === 'asc'
+                    ? strnatcasecmp((string) $l, (string) $r)
+                    : strnatcasecmp((string) $r, (string) $l);
+            });
+
+            $totalRows = count($rows);
+            if (!$fetchAll) {
+                $offset = max(0, ($page - 1) * $perPage);
+                $rows = array_slice($rows, $offset, $perPage);
+                $meta['page'] = $page;
+                $meta['per_page'] = $perPage;
+            } else {
+                $meta['page'] = 1;
+                $meta['per_page'] = $totalRows;
+            }
+
+            $rows = array_map(static function (array $row): array {
+                unset($row['schedule_sort']);
+                return $row;
+            }, $rows);
+
+            $meta['total'] = $totalRows;
+            $meta['count'] = count($rows);
+
+            $summary = [
+                'total' => $totalRows,
+            ];
+
+            return new ReportResult($rows, $summary, $meta, []);
+        },
+    ],
     'orders.without_participants' => [
         'type' => 'class',
         'class' => OrdersWithoutParticipantsReport::class,
