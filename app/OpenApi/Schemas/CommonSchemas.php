@@ -83,7 +83,7 @@ use OpenApi\Annotations as OA;
  *     schema="OrderStatusUpdatePayload",
  *     type="object",
  *     required={"status"},
- *     @OA\Property(property="status", type="string", example="paid"),
+ *     @OA\Property(property="status", type="string", enum={"waiting_product_retrieve"}, example="waiting_product_retrieve"),
  *     @OA\Property(property="note", type="string", nullable=true, example="Atualizado manualmente")
  * )
  *

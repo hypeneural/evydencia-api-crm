@@ -39,6 +39,8 @@ use Slim\Routing\RouteContext;
 final class UpdateOrderStatusAction
 
 {
+    private const ALLOWED_STATUSES = ['waiting_product_retrieve'];
+
 
     public function __construct(
 
@@ -101,7 +103,15 @@ final class UpdateOrderStatusAction
 
 
 
-        $status = trim((string) $payload['status']);
+        $status = $this->sanitizeStatus($payload['status'] ?? null);
+        if ($status === null) {
+            return $this->responder->validationError($response, $traceId, [
+                [
+                    'field' => 'status',
+                    'message' => 'Status invalido.',
+                ],
+            ]);
+        }
 
         $note = isset($payload['note']) ? $this->sanitizeOptionalString($payload['note']) : null;
 
@@ -117,13 +127,33 @@ final class UpdateOrderStatusAction
 
         } catch (CrmRequestException $exception) {
 
+            if ($exception->getStatusCode() === 404) {
+
+                return $this->responder->notFound(
+
+                    $response,
+
+                    $traceId,
+
+                    $this->resolveCrmMessage($exception->getPayload(), 'Pedido nao encontrado.')
+
+                );
+
+            }
+
             return $this->responder->badGateway(
 
                 $response,
 
                 $traceId,
 
-                sprintf('CRM error (status %d).', $exception->getStatusCode())
+                $this->resolveCrmMessage(
+
+                    $exception->getPayload(),
+
+                    sprintf('CRM error (status %d).', $exception->getStatusCode())
+
+                )
 
             );
 
@@ -265,9 +295,15 @@ final class UpdateOrderStatusAction
 
 
 
+        $rawStatus = $payload['status'] ?? null;
+
+
+        $normalizedStatus = is_string($rawStatus) ? trim($rawStatus) : $rawStatus;
+
+
         try {
 
-            v::stringType()->notEmpty()->length(2, 64)->setName('status')->assert($payload['status'] ?? null);
+            v::stringType()->notEmpty()->length(2, 64)->setName('status')->assert($normalizedStatus);
 
         } catch (NestedValidationException $exception) {
 
@@ -281,6 +317,28 @@ final class UpdateOrderStatusAction
 
         }
 
+
+        $sanitizedStatus = $this->sanitizeStatus($normalizedStatus);
+
+        if ($sanitizedStatus !== null && !in_array($sanitizedStatus, self::ALLOWED_STATUSES, true)) {
+
+            $errors[] = [
+
+                'field' => 'status',
+
+                'message' => sprintf(
+
+                    'Status "%s" nao permitido. Statuses validos: %s.',
+
+                    $sanitizedStatus,
+
+                    implode(', ', self::ALLOWED_STATUSES)
+
+                ),
+
+            ];
+
+        }
 
 
         if (array_key_exists('note', $payload) && $payload['note'] !== null) {
@@ -342,6 +400,74 @@ final class UpdateOrderStatusAction
 
 
         return null;
+
+    }
+
+
+
+    private function sanitizeStatus(mixed $value): ?string
+
+    {
+
+        if (!is_string($value)) {
+
+            return null;
+
+        }
+
+
+
+        $status = trim($value);
+
+
+
+        return $status === '' ? null : $status;
+
+    }
+
+
+
+    /**
+
+     * @param array<string, mixed> $payload
+
+     */
+
+    private function resolveCrmMessage(array $payload, string $default): string
+
+    {
+
+        $errorNode = $payload['error'] ?? null;
+
+
+
+        $possibleMessages = [
+
+            $payload['message'] ?? null,
+
+            is_string($errorNode) ? $errorNode : null,
+
+            is_array($errorNode) ? ($errorNode['message'] ?? null) : null,
+
+            is_array($errorNode) ? ($errorNode['detail'] ?? null) : null,
+
+        ];
+
+
+
+        foreach ($possibleMessages as $message) {
+
+            if (is_string($message) && $message !== '') {
+
+                return $message;
+
+            }
+
+        }
+
+
+
+        return $default;
 
     }
 
