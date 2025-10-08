@@ -13,7 +13,6 @@ use Exception;
 final class CampaignSchedulePayloadNormalizer
 {
     private DateTimeZone $appTimezone;
-    private DateTimeZone $utc;
 
     public function __construct(private readonly Settings $settings)
     {
@@ -24,7 +23,6 @@ final class CampaignSchedulePayloadNormalizer
         }
 
         $this->appTimezone = new DateTimeZone($timezone);
-        $this->utc = new DateTimeZone('UTC');
     }
 
     /**
@@ -156,7 +154,7 @@ final class CampaignSchedulePayloadNormalizer
             return null;
         }
 
-        return $date->setTimezone($this->utc);
+        return $date;
     }
 
     private function normalizeContacts(mixed $contacts, array &$errors): ?string
@@ -456,6 +454,6 @@ final class CampaignSchedulePayloadNormalizer
 
     private function formatDateTime(DateTimeImmutable $date): string
     {
-        return $date->setTimezone($this->utc)->format('Y-m-d\TH:i:s\Z');
+        return $date->setTimezone($this->appTimezone)->format('Y-m-d\TH:i');
     }
 }
