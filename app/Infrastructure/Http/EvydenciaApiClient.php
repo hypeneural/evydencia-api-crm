@@ -87,7 +87,7 @@ final class EvydenciaApiClient
             $payload['note'] = $note;
         }
 
-        return $this->put('order/status', $payload, $traceId);
+        return $this->put('orders/status', $payload, $traceId);
     }
 
     /**
@@ -178,6 +178,28 @@ final class EvydenciaApiClient
             $decoded = $bodyString === '' ? [] : json_decode($bodyString, true);
             $isJson = !($bodyString !== '' && $decoded === null);
             $payload = $isJson && is_array($decoded) ? $decoded : [];
+            $contentType = $response->getHeaderLine('Content-Type');
+
+            if ($bodyString !== '' && !$isJson) {
+                $this->logger->warning('CRM returned non-JSON payload', [
+                    'trace_id' => $traceId,
+                    'method' => $method,
+                    'uri' => $normalizedUri,
+                    'status_code' => $statusCode,
+                    'content_type' => $contentType,
+                ]);
+
+                $errorPayload = [
+                    'content_type' => $contentType,
+                    'raw' => substr($bodyString, 0, 4096),
+                ];
+
+                throw new CrmRequestException(
+                    $statusCode >= 400 ? $statusCode : 502,
+                    $errorPayload,
+                    'CRM returned an unexpected response format.'
+                );
+            }
 
             if ($statusCode >= 400) {
                 $this->logger->warning('CRM responded with an error status', [
