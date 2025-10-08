@@ -6,7 +6,7 @@ namespace App\Actions\Labels;
 
 use App\Application\Services\LabelService;
 use App\Application\Support\ApiResponder;
-use GuzzleHttp\Psr7\Utils;
+use App\Domain\Exception\NotFoundException;
 use OpenApi\Annotations as OA;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -65,6 +65,9 @@ final class GenerateOrderLabelAction
 
         try {
             $result = $this->labelService->generateLabel($orderId, $traceId);
+        } catch (NotFoundException $exception) {
+            return $this->responder->notFound($response, $traceId, $exception->getMessage() ?: 'Pedido nao encontrado.')
+                ->withHeader('X-Request-Id', $traceId);
         } catch (RuntimeException $exception) {
             $this->logger->error('Failed to generate order label', [
                 'trace_id' => $traceId,

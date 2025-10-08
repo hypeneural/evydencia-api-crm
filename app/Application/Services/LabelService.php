@@ -6,6 +6,7 @@ namespace App\Application\Services;
 
 use App\Domain\Exception\CrmRequestException;
 use App\Domain\Exception\CrmUnavailableException;
+use App\Domain\Exception\NotFoundException;
 use App\Infrastructure\Http\EvydenciaApiClient;
 use App\Settings\Settings;
 use Endroid\QrCode\Builder\Builder;
@@ -589,15 +590,21 @@ final class LabelService
     {
         try {
             $response = $this->apiClient->fetchOrderDetail($orderId, $traceId);
-        } catch (CrmUnavailableException|CrmRequestException $exception) {
+        } catch (CrmRequestException $exception) {
+            if ($exception->getStatusCode() === 404) {
+                throw new NotFoundException('Pedido nao encontrado.');
+            }
+
             throw new RuntimeException('Nao foi possivel consultar o pedido no CRM.', 0, $exception);
+        } catch (CrmUnavailableException $exception) {
+            throw new RuntimeException('CRM indisponivel no momento.', 0, $exception);
         }
 
         $body = $response['body'] ?? [];
         $order = $this->extractOrderPayload($body);
 
         if ($order === null) {
-            throw new RuntimeException('Dados do pedido nao encontrados no CRM.');
+            throw new NotFoundException('Pedido nao encontrado.');
         }
 
         $id = $this->extractOrderId($order);
