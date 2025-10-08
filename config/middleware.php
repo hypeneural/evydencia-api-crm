@@ -53,8 +53,8 @@ return function (App $app): void {
         'cache' => $corsSettings['max_age'] ?? 86400,
     ];
 
-    $app->add(new CorsMiddleware($corsOptions));
     $app->addRoutingMiddleware();
+    $app->add(new CorsMiddleware($corsOptions));
 
     /** @var LoggerInterface $logger */
     $logger = $container->get(LoggerInterface::class);
