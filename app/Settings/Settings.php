@@ -91,6 +91,14 @@ final class Settings
     /**
      * @return array<string, mixed>
      */
+    public function getMedia(): array
+    {
+        return $this->get('media', []);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     public function getOpenApi(): array
     {
         return $this->get('openapi', []);

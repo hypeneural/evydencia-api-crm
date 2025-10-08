@@ -56,6 +56,20 @@ return [
         'client_token' => $_ENV['ZAPI_CLIENT_TOKEN'] ?? '',
         'timeout' => isset($_ENV['ZAPI_TIMEOUT']) ? (float) $_ENV['ZAPI_TIMEOUT'] : 30.0,
     ],
+    'media' => [
+        'scheduled_posts' => [
+            'storage_path' => $_ENV['SCHEDULED_POSTS_STORAGE_PATH'] ?? dirname(__DIR__) . '/public/status-media',
+            'base_url' => rtrim($_ENV['SCHEDULED_POSTS_BASE_URL'] ?? (($_ENV['APP_URL'] ?? 'http://localhost') . '/status-media'), '/'),
+            'image_max_bytes' => isset($_ENV['SCHEDULED_POSTS_IMAGE_MAX_SIZE_MB'])
+                ? (int) $_ENV['SCHEDULED_POSTS_IMAGE_MAX_SIZE_MB'] * 1024 * 1024
+                : 5 * 1024 * 1024,
+            'video_max_bytes' => isset($_ENV['SCHEDULED_POSTS_VIDEO_MAX_SIZE_MB'])
+                ? (int) $_ENV['SCHEDULED_POSTS_VIDEO_MAX_SIZE_MB'] * 1024 * 1024
+                : 10 * 1024 * 1024,
+            'image_mime_types' => array_filter(array_map('trim', explode(',', $_ENV['SCHEDULED_POSTS_IMAGE_MIME_TYPES'] ?? 'image/jpeg,image/png,image/gif,image/webp'))),
+            'video_mime_types' => array_filter(array_map('trim', explode(',', $_ENV['SCHEDULED_POSTS_VIDEO_MIME_TYPES'] ?? 'video/mp4,video/mpeg,video/quicktime,video/x-msvideo'))),
+        ],
+    ],
     'labels' => [
         'dpi' => (int) ($_ENV['LABEL_DPI'] ?? 300),
         'width_mm' => (float) ($_ENV['LABEL_WIDTH_MM'] ?? 100),
@@ -121,4 +135,3 @@ return [
         ),
     ],
 ];
-

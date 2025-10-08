@@ -8,6 +8,7 @@ use App\Application\Services\LabelService;
 use App\Application\Services\OrderService;
 use App\Application\Services\ReportEngine;
 use App\Application\Services\ReportService;
+use App\Application\Services\ScheduledPostMediaService;
 use App\Application\Services\ScheduledPostService;
 use App\Application\Services\WhatsAppService;
 use App\Application\Support\ApiResponder;
@@ -179,6 +180,13 @@ return static function (ContainerBuilder $containerBuilder): void {
             return new ScheduledPostService(
                 $container->get(ScheduledPostRepositoryInterface::class),
                 $container->get(ScheduledPostCache::class),
+                $container->get(WhatsAppService::class),
+                $container->get(LoggerInterface::class)
+            );
+        },
+        ScheduledPostMediaService::class => static function (ContainerInterface $container): ScheduledPostMediaService {
+            return new ScheduledPostMediaService(
+                $container->get(Settings::class),
                 $container->get(LoggerInterface::class)
             );
         },
