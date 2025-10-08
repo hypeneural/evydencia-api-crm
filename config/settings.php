@@ -74,20 +74,21 @@ return [
         'font' => $_ENV['LABEL_FONT'] ?? 'ArchivoBlack-Regular.ttf',
         'color_bg' => [0, 0, 0],
         'color_fg' => [255, 255, 255],
+        'footer_url_enabled' => false,
         'layout' => [
-            'nome_full' => ['x' => '11%', 'y' => '20%', 'size_pt' => 32, 'max_w' => '60%', 'align' => 'left'],
+            'nome_full' => ['x' => '11%', 'y' => '23%', 'size_pt' => 52, 'min_size_pt' => 20, 'max_w' => '60%', 'align' => 'left'],
             'primeiro' => ['x' => '83%', 'y' => '42%', 'size_pt' => 27, 'max_w' => '14%', 'align' => 'center'],
             'pacote' => ['x' => '12%', 'y' => '44%', 'size_pt' => 34, 'max_w' => '72%', 'align' => 'left'],
             'data' => ['x' => '11%', 'y' => '66%', 'size_pt' => 37, 'max_w' => '30%', 'align' => 'left'],
             'whats_ddd' => ['x' => '40%', 'y' => '66%', 'size_pt' => 20, 'max_w' => '7%', 'align' => 'left'],
             'whats_num' => ['x' => '45%', 'y' => '66%', 'size_pt' => 30, 'max_w' => '33%', 'align' => 'left'],
-            'linha_url' => ['x' => '10%', 'y' => '84%', 'size_pt' => 28, 'max_w' => '50%', 'align' => 'left'],
-            'qrcode' => ['size_px' => 100, 'x' => '83%', 'y' => '71%', 'margin_modules' => 0, 'ec_level' => 'H'],
+            'linha_url' => ['x' => '10%', 'y' => '88%', 'size_pt' => 43, 'max_w' => '50%', 'align' => 'left'],
+            'qrcode' => ['size_px' => 240, 'x' => '83%', 'y' => '71%', 'margin_modules' => 0, 'ec_level' => 'H'],
         ],
         'url_template' => $_ENV['LABEL_URL_TEMPLATE'] ?? 'http://minhas.fotosdenatal.com/{id}',
-        'copy_template' => $_ENV['LABEL_COPY_TEMPLATE'] ?? '{primeiro}, acesse suas fotos no QR CODE ao lado',
+        'copy_template' => $_ENV['LABEL_COPY_TEMPLATE'] ?? 'Acesse suas fotos',
         'mock_data' => [
-            'nome_completo' => $_ENV['LABEL_MOCK_NOME_COMPLETO'] ?? 'Anderson Marques Vieira',
+            'nome_completo' => $_ENV['LABEL_MOCK_NOME_COMPLETO'] ?? 'Caroline T. De M. P. Dal Pias',
             'primeiro_nome' => $_ENV['LABEL_MOCK_PRIMEIRO_NOME'] ?? 'ANDERSON',
             'pacote' => $_ENV['LABEL_MOCK_PACOTE'] ?? 'Experiencia Entao e Natal',
             'data' => $_ENV['LABEL_MOCK_DATA'] ?? '25/09/25',
@@ -120,6 +121,4 @@ return [
         ),
     ],
 ];
-
-
 

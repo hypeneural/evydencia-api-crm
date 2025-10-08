@@ -50,13 +50,14 @@ final class LabelService
         'color_fg' => [255, 255, 255],
         'output_dir' => '/public/etiqueta/out',
         'filename_pattern' => 'etiqueta_{id}.png',
+        'footer_url_enabled' => true,
         'qr' => [
             'size_px' => 100,
             'margin_modules' => 0,
             'ec_level' => 'H',
         ],
         'layout' => [
-            'nome_full' => ['x' => '11%', 'y' => '20%', 'size_pt' => 32, 'max_w' => '60%', 'align' => 'left'],
+            'nome_full' => ['x' => '11%', 'y' => '20%', 'size_pt' => 52, 'min_size_pt' => 20, 'max_w' => '60%', 'align' => 'left'],
             'primeiro' => ['x' => '83%', 'y' => '42%', 'size_pt' => 27, 'max_w' => '14%', 'align' => 'center'],
             'pacote' => ['x' => '12%', 'y' => '44%', 'size_pt' => 34, 'max_w' => '72%', 'align' => 'left'],
             'data' => ['x' => '11%', 'y' => '66%', 'size_pt' => 37, 'max_w' => '30%', 'align' => 'left'],
@@ -76,6 +77,22 @@ final class LabelService
             'id' => '1515',
         ],
     ];
+
+    /**
+     * Words that must not be abbreviated (normalized form).
+     *
+     * @var array<int, string>
+     */
+    private const NAME_DO_NOT_ABBREVIATE = [
+        'de', 'da', 'do', 'das', 'dos', 'e', 'del', "d'", 'd', 'di', 'dal', 'van', 'von', 'la', 'le',
+    ];
+
+    private const NAME_MIN_KEEP = 2;
+
+    /**
+     * Only abbreviate when the name has more than this number of tokens.
+     */
+    private const NAME_ABBREVIATE_THRESHOLD = 3;
 
     /**
      * @var array<string, mixed>
@@ -115,6 +132,10 @@ final class LabelService
             $fontPath = $this->resolveFontPath($config);
 
             $data = $this->resolveData($orderId, $traceId);
+            $displayName = $this->formatDisplayName($data['nome_completo']);
+            if ($displayName === '') {
+                $displayName = $data['nome_completo'];
+            }
             $url = str_replace('{id}', $data['id'], (string) $config['url_template']);
             $copy = str_replace('{primeiro}', $data['primeiro_nome'], (string) $config['copy_template']);
             $whats = $this->formatWhatsApp($data['whats']);
@@ -122,16 +143,27 @@ final class LabelService
             $layout = $config['layout'];
             $textColor = $this->allocateColor($image, $config['color_fg']);
 
-            $this->drawText(
+            $nomeFullLayout = $layout['nome_full'];
+            $nomeMaxWidth = $metrics['w']($nomeFullLayout['max_w']);
+            $nomeMaxSize = (int) $nomeFullLayout['size_pt'];
+            $nomeMinSize = isset($nomeFullLayout['min_size_pt']) ? (int) $nomeFullLayout['min_size_pt'] : max(16, (int) round($nomeMaxSize * 0.6));
+            $nomeFontSize = $this->fitFontSize(
+                $displayName,
+                $fontPath,
+                $nomeMaxWidth,
+                $nomeMaxSize,
+                $nomeMinSize
+            );
+
+            $this->drawSingleLineText(
                 $image,
-                $data['nome_completo'],
-                $metrics['x']($layout['nome_full']['x']),
-                $metrics['y']($layout['nome_full']['y']),
-                (int) $layout['nome_full']['size_pt'],
+                $displayName,
+                $metrics['x']($nomeFullLayout['x']),
+                $metrics['y']($nomeFullLayout['y']),
+                $nomeFontSize,
                 $textColor,
                 $fontPath,
-                $layout['nome_full']['align'],
-                $metrics['w']($layout['nome_full']['max_w'])
+                $nomeFullLayout['align']
             );
 
             $this->drawText(
@@ -194,17 +226,24 @@ final class LabelService
                 $metrics['w']($layout['whats_num']['max_w'])
             );
 
-            $this->drawText(
-                $image,
-                sprintf('%s  %s', $copy, $url),
-                $metrics['x']($layout['linha_url']['x']),
-                $metrics['y']($layout['linha_url']['y']),
-                (int) $layout['linha_url']['size_pt'],
-                $textColor,
-                $fontPath,
-                $layout['linha_url']['align'],
-                $metrics['w']($layout['linha_url']['max_w'])
-            );
+            $footerText = trim((string) $copy);
+            if (($config['footer_url_enabled'] ?? true) === true) {
+                $footerText = trim($footerText . '  ' . $url);
+            }
+
+            if ($footerText !== '') {
+                $this->drawText(
+                    $image,
+                    $footerText,
+                    $metrics['x']($layout['linha_url']['x']),
+                    $metrics['y']($layout['linha_url']['y']),
+                    (int) $layout['linha_url']['size_pt'],
+                    $textColor,
+                    $fontPath,
+                    $layout['linha_url']['align'],
+                    $metrics['w']($layout['linha_url']['max_w'])
+                );
+            }
 
             $this->drawQrCode($image, $layout['qrcode'], $metrics, $url);
 
@@ -216,6 +255,7 @@ final class LabelService
                 'pacote' => $data['pacote'],
                 'data' => $data['data'],
                 'whats' => $data['whats'],
+                'nome_display' => $displayName,
                 'url' => $url,
             ];
 
@@ -490,6 +530,38 @@ final class LabelService
         }
     }
 
+    private function drawSingleLineText(
+        GdImage $image,
+        string $text,
+        int $x,
+        int $y,
+        int $sizePt,
+        int $color,
+        string $fontPath,
+        string $align = 'left'
+    ): void {
+        $text = trim($text);
+        if ($text === '') {
+            return;
+        }
+
+        $bbox = imagettfbbox($sizePt, 0, $fontPath, $text);
+        if ($bbox === false) {
+            return;
+        }
+
+        $width = $bbox[2] - $bbox[0];
+        $tx = $x;
+
+        if ($align === 'center') {
+            $tx = $x - (int) round($width / 2);
+        } elseif ($align === 'right') {
+            $tx = $x - $width;
+        }
+
+        imagettftext($image, $sizePt, 0, $tx, $y, $color, $fontPath, $text);
+    }
+
     /**
      * @return array<int, string>
      */
@@ -529,6 +601,123 @@ final class LabelService
         }
 
         return $lines;
+    }
+
+    private function formatDisplayName(string $fullName): string
+    {
+        $normalized = trim(preg_replace('/\s+/u', ' ', $fullName));
+        if ($normalized === '') {
+            return '';
+        }
+
+        $tokens = preg_split('/\s+/u', $normalized, -1, PREG_SPLIT_NO_EMPTY);
+        if (!is_array($tokens) || $tokens === []) {
+            return $normalized;
+        }
+
+        if (count($tokens) <= self::NAME_ABBREVIATE_THRESHOLD) {
+            return $normalized;
+        }
+
+        $normalizeToken = static function (string $token): string {
+            $lower = mb_strtolower($token, 'UTF-8');
+            $transliterated = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $lower);
+            if ($transliterated !== false) {
+                $lower = $transliterated;
+            }
+
+            $lower = preg_replace("/[^a-z']+/u", '', $lower);
+
+            return $lower ?? '';
+        };
+
+        $shouldKeep = static function (string $token) use ($normalizeToken): bool {
+            $normalized = $normalizeToken($token);
+            return in_array($normalized, self::NAME_DO_NOT_ABBREVIATE, true);
+        };
+
+        $lastIndex = count($tokens) - 1;
+        $startLastBlock = $lastIndex;
+        while ($startLastBlock - 1 >= 1) {
+            $previous = $tokens[$startLastBlock - 1];
+            if ($shouldKeep($previous)) {
+                $startLastBlock--;
+            } else {
+                break;
+            }
+        }
+
+        $isInLastBlock = static fn (int $index) => $index >= $startLastBlock;
+
+        $abbreviate = static function (string $word): string {
+            if (mb_strlen($word, 'UTF-8') <= self::NAME_MIN_KEEP) {
+                return $word;
+            }
+
+            if (mb_strpos($word, '-', 0, 'UTF-8') !== false) {
+                $parts = explode('-', $word);
+                foreach ($parts as $idx => $part) {
+                    $parts[$idx] = (mb_strlen($part, 'UTF-8') > self::NAME_MIN_KEEP)
+                        ? mb_substr($part, 0, 1, 'UTF-8') . '.'
+                        : $part;
+                }
+
+                return implode('-', $parts);
+            }
+
+            return mb_substr($word, 0, 1, 'UTF-8') . '.';
+        };
+
+        $result = [];
+        foreach ($tokens as $index => $token) {
+            if ($index === 0) {
+                $result[] = $token;
+                continue;
+            }
+
+            if ($isInLastBlock($index)) {
+                $result[] = $token;
+                continue;
+            }
+
+            if ($shouldKeep($token)) {
+                $result[] = $token;
+                continue;
+            }
+
+            $result[] = $abbreviate($token);
+        }
+
+        return implode(' ', $result);
+    }
+
+    private function fitFontSize(
+        string $text,
+        string $fontPath,
+        int $maxWidth,
+        int $maxSizePt,
+        int $minSizePt
+    ): int {
+        $text = trim($text);
+        if ($text === '') {
+            return $minSizePt;
+        }
+
+        $size = max($minSizePt, $maxSizePt);
+
+        while ($size >= $minSizePt) {
+            $bbox = imagettfbbox($size, 0, $fontPath, $text);
+            if ($bbox !== false) {
+                $width = $bbox[2] - $bbox[0];
+                if ($width <= $maxWidth) {
+                    return $size;
+                }
+            }
+
+            $size--;
+        }
+
+        return $minSizePt;
     }
 
     private function resolveErrorCorrection(string $level): ErrorCorrectionLevelInterface
