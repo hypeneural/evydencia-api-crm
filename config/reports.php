@@ -134,9 +134,11 @@ return [
         ],
         'columns' => [
             ['key' => 'id', 'label' => 'Pedido', 'type' => 'integer'],
+            ['key' => 'uuid', 'label' => 'UUID', 'type' => 'string'],
             ['key' => 'schedule_datetime', 'label' => 'Sessao (bruta)', 'type' => 'string'],
             ['key' => 'schedule_1', 'label' => 'Sessao', 'type' => 'string'],
             ['key' => 'schedule_time', 'label' => 'Horario', 'type' => 'string'],
+            ['key' => 'created_at', 'label' => 'Criado Em', 'type' => 'string'],
             ['key' => 'customer_first_name', 'label' => 'Primeiro Nome', 'type' => 'string'],
             ['key' => 'customer_name', 'label' => 'Nome Completo', 'type' => 'string'],
             ['key' => 'customer_whatsapp_plain', 'label' => 'WhatsApp (limpo)', 'type' => 'string'],
@@ -322,11 +324,11 @@ return [
                 $length = strlen($digits);
 
                 if ($length === 11) {
-                    return sprintf('+55 (%s) %s-%s', substr($digits, 0, 2), substr($digits, 2, 5), substr($digits, 7));
+                    return sprintf('(%s) %s-%s', substr($digits, 0, 2), substr($digits, 2, 5), substr($digits, 7));
                 }
 
                 if ($length === 10) {
-                    return sprintf('+55 (%s) %s-%s', substr($digits, 0, 2), substr($digits, 2, 4), substr($digits, 6));
+                    return sprintf('(%s) %s-%s', substr($digits, 0, 2), substr($digits, 2, 4), substr($digits, 6));
                 }
 
                 if ($length === 9) {
@@ -364,19 +366,19 @@ return [
                     return '';
                 }
 
-                $names = [];
                 foreach ($items as $item) {
                     if (!is_array($item)) {
                         continue;
                     }
+
                     $product = $item['product'] ?? [];
                     $name = is_array($product) ? ($product['name'] ?? null) : null;
                     if (is_string($name) && $name !== '') {
-                        $names[$name] = true;
+                        return $name;
                     }
                 }
 
-                return implode(', ', array_keys($names));
+                return '';
             };
 
             $rows = array_map(static function (array $order) use ($formatSchedule, $normalizePhone, $formatPhone, $extractFirstName, $collectProducts): array {
@@ -389,19 +391,18 @@ return [
                 $phonePlain = $normalizePhone(is_string($phoneRaw) ? $phoneRaw : null);
 
                 $status = $order['status'] ?? [];
-                $statusId = is_array($status) ? (int) ($status['id'] ?? 0) : (int) ($order['status_id'] ?? 0);
                 $statusName = is_array($status) ? (string) ($status['name'] ?? '') : (string) ($order['status_name'] ?? '');
 
                 $id = $order['id'] ?? null;
-                if ($id === null && isset($order['uuid'])) {
-                    $id = (string) $order['uuid'];
-                }
+                $uuid = isset($order['uuid']) && is_string($order['uuid']) ? $order['uuid'] : null;
 
                 return [
                     'id' => is_numeric($id) ? (int) $id : (string) $id,
+                    'uuid' => $uuid,
                     'schedule_datetime' => $schedule['iso'],
                     'schedule_1' => $schedule['date'],
                     'schedule_time' => $schedule['time'],
+                    'created_at' => isset($order['created_at']) ? (string) $order['created_at'] : null,
                     'schedule_sort' => $schedule['timestamp'],
                     'customer_first_name' => $extractFirstName($customerName),
                     'customer_name' => $customerName,
@@ -409,7 +410,7 @@ return [
                     'customer_whatsapp_formatted' => $formatPhone($phonePlain),
                     'products' => $collectProducts($order),
                     'status_name' => $statusName,
-                    'link' => $id === null ? null : sprintf('http://nossas.fotosdenatal.com/%s', $id),
+                    'link' => $uuid === null ? null : sprintf('https://evydencia.com/gestao/pedidos/%s/detalhes', $uuid),
                 ];
             }, $orders);
 
