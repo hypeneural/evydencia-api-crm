@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Application\Services;
 
+use App\Domain\Exception\CrmRequestException;
+use App\Domain\Exception\CrmUnavailableException;
+use App\Infrastructure\Http\EvydenciaApiClient;
 use App\Settings\Settings;
 use Endroid\QrCode\Builder\Builder;
 use Endroid\QrCode\Color\Color;
@@ -61,7 +64,7 @@ final class LabelService
             'linha_url' => ['x' => '10%', 'y' => '84%', 'size_pt' => 28, 'max_w' => '50%', 'align' => 'left'],
             'qrcode' => ['size_px' => 100, 'x' => '83%', 'y' => '71%', 'margin_modules' => 0, 'ec_level' => 'H'],
         ],
-        'url_template' => 'http://minhas.fotosdenatal.com/{id}',
+        'url_template' => 'http://nossas.fotosdenatal.com/{id}',
         'copy_template' => '{primeiro}, acesse suas fotos no QR CODE ao lado',
         'mock_data' => [
             'nome_completo' => 'Anderson Marques Vieira',
@@ -80,7 +83,8 @@ final class LabelService
 
     public function __construct(
         private readonly Settings $settings,
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface $logger,
+        private readonly EvydenciaApiClient $apiClient
     ) {
         $this->config = $this->hydrateConfig();
     }
@@ -109,7 +113,7 @@ final class LabelService
             $metrics = $this->resolveMetrics($config, $dpi, $width, $height);
             $fontPath = $this->resolveFontPath($config);
 
-            $data = $this->resolveData($orderId);
+            $data = $this->resolveData($orderId, $traceId);
             $url = str_replace('{id}', $data['id'], (string) $config['url_template']);
             $copy = str_replace('{primeiro}', $data['primeiro_nome'], (string) $config['copy_template']);
             $whats = $this->formatWhatsApp($data['whats']);
@@ -205,6 +209,7 @@ final class LabelService
 
             $payload = [
                 'id' => $data['id'],
+                'uuid' => $data['uuid'],
                 'nome_completo' => $data['nome_completo'],
                 'primeiro_nome' => $data['primeiro_nome'],
                 'pacote' => $data['pacote'],
@@ -570,20 +575,185 @@ final class LabelService
     }
 
     /**
-     * @return array<string, string>
+     * @return array{
+     *     id: string,
+     *     uuid: string,
+     *     nome_completo: string,
+     *     primeiro_nome: string,
+     *     pacote: string,
+     *     data: string,
+     *     whats: string
+     * }
      */
-    private function resolveData(string $orderId): array
+    private function resolveData(string $orderId, string $traceId): array
     {
-        $mock = $this->config['mock_data'];
+        try {
+            $response = $this->apiClient->fetchOrderDetail($orderId, $traceId);
+        } catch (CrmUnavailableException|CrmRequestException $exception) {
+            throw new RuntimeException('Nao foi possivel consultar o pedido no CRM.', 0, $exception);
+        }
+
+        $body = $response['body'] ?? [];
+        $order = $this->extractOrderPayload($body);
+
+        if ($order === null) {
+            throw new RuntimeException('Dados do pedido nao encontrados no CRM.');
+        }
+
+        $id = $this->extractOrderId($order);
+        $uuid = $this->extractOrderUuid($order, $orderId);
+        $customer = is_array($order['customer'] ?? null) ? $order['customer'] : [];
+        $nomeCompleto = $this->normalizeName($customer['name'] ?? '');
+        $primeiro = $this->extractFirstName($nomeCompleto);
+        $schedule = $this->extractSchedule($order);
+        $pacote = $this->extractProductName($order);
+        $whats = $this->normalizePhone($customer['whatsapp'] ?? '');
 
         return [
-            'id' => $mock['id'] ?? $orderId,
-            'nome_completo' => (string) ($mock['nome_completo'] ?? 'Cliente Exemplo'),
-            'primeiro_nome' => (string) ($mock['primeiro_nome'] ?? 'CLIENTE'),
-            'pacote' => (string) ($mock['pacote'] ?? 'Pacote de Natal'),
-            'data' => (string) ($mock['data'] ?? date('d/m/y')),
-            'whats' => (string) ($mock['whats'] ?? '48999999999'),
+            'id' => $id,
+            'uuid' => $uuid,
+            'nome_completo' => $nomeCompleto,
+            'primeiro_nome' => $primeiro,
+            'pacote' => $pacote,
+            'data' => $schedule,
+            'whats' => $whats,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     */
+    private function extractOrderPayload(array $body): ?array
+    {
+        $payload = $body['data'] ?? $body;
+
+        if (is_array($payload)) {
+            if (array_is_list($payload)) {
+                $payload = $payload[0] ?? null;
+            }
+        } else {
+            $payload = null;
+        }
+
+        return is_array($payload) ? $payload : null;
+    }
+
+    /**
+     * @param array<string, mixed> $order
+     */
+    private function extractOrderId(array $order): string
+    {
+        $id = $order['id'] ?? null;
+
+        if (is_numeric($id)) {
+            return (string) $id;
+        }
+
+        if (is_string($id) && $id !== '') {
+            return $id;
+        }
+
+        $uuid = $order['uuid'] ?? null;
+        if (is_string($uuid) && $uuid !== '') {
+            return $uuid;
+        }
+
+        throw new RuntimeException('Pedido sem identificador valido.');
+    }
+
+    /**
+     * @param array<string, mixed> $order
+     */
+    private function extractOrderUuid(array $order, string $fallback): string
+    {
+        $uuid = $order['uuid'] ?? null;
+
+        if (is_string($uuid) && $uuid !== '') {
+            return $uuid;
+        }
+
+        if (is_string($fallback) && $fallback !== '') {
+            return $fallback;
+        }
+
+        throw new RuntimeException('UUID do pedido nao informado.');
+    }
+
+    /**
+     * @param array<string, mixed> $order
+     */
+    private function extractProductName(array $order): string
+    {
+        $items = $order['items'] ?? [];
+        if (!is_array($items)) {
+            return 'Pacote Indefinido';
+        }
+
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $product = $item['product'] ?? [];
+            $name = is_array($product) ? ($product['name'] ?? null) : null;
+            if (is_string($name) && trim($name) !== '') {
+                return $this->normalizePackageName($name);
+            }
+        }
+
+        return 'Pacote Indefinido';
+    }
+
+    /**
+     * @param array<string, mixed> $order
+     */
+    private function extractSchedule(array $order): string
+    {
+        $raw = $order['schedule_1'] ?? ($order['schedule_one'] ?? null);
+        if (!is_string($raw) || trim($raw) === '') {
+            return '--/--/--';
+        }
+
+        try {
+            $date = new \DateTimeImmutable($raw);
+        } catch (\Throwable) {
+            return '--/--/--';
+        }
+
+        return $date->format('d/m/y');
+    }
+
+    private function normalizeName(string $value): string
+    {
+        $trimmed = trim($value);
+
+        return $trimmed === '' ? 'Cliente' : $trimmed;
+    }
+
+    private function extractFirstName(string $value): string
+    {
+        $parts = preg_split('/\s+/', trim($value));
+        if (!is_array($parts) || $parts === []) {
+            return $value;
+        }
+
+        return $parts[0] ?? $value;
+    }
+
+    private function normalizePackageName(string $value): string
+    {
+        return trim($value) === '' ? 'Pacote Indefinido' : trim($value);
+    }
+
+    private function normalizePhone(?string $value): string
+    {
+        if (!is_string($value) || trim($value) === '') {
+            return '';
+        }
+
+        $digits = preg_replace('/\D+/', '', $value);
+
+        return $digits ?? '';
     }
 
     private function mmToPx(float $mm, int $dpi): int

@@ -218,7 +218,8 @@ return static function (ContainerBuilder $containerBuilder): void {
         LabelService::class => static function (ContainerInterface $container): LabelService {
             return new LabelService(
                 $container->get(Settings::class),
-                $container->get(LoggerInterface::class)
+                $container->get(LoggerInterface::class),
+                $container->get(EvydenciaApiClient::class)
             );
         },
         OrderService::class => static function (ContainerInterface $container): OrderService {
