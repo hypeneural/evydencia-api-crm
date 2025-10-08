@@ -71,18 +71,14 @@ final class BlacklistService
     public function create(array $payload, string $traceId, ?string $idempotencyKey = null): array
     {
         $name = $this->sanitizeString($payload['name'] ?? '');
+        if ($name === '') {
+            $name = $this->defaultName();
+        }
         $whatsapp = $this->sanitizeWhatsapp($payload['whatsapp'] ?? '');
         $hasClosedOrder = $this->sanitizeBool($payload['has_closed_order'] ?? false);
         $observation = $this->sanitizeNullableString($payload['observation'] ?? null);
 
         $errors = [];
-        if ($name === '') {
-            $errors[] = [
-                'field' => 'name',
-                'message' => 'Nome obrigatorio.',
-            ];
-        }
-
         if ($whatsapp === '') {
             $errors[] = [
                 'field' => 'whatsapp',
@@ -138,17 +134,13 @@ final class BlacklistService
     public function ensureClosedOrderEntry(array $payload, string $traceId): array
     {
         $name = $this->sanitizeString($payload['name'] ?? '');
+        if ($name === '') {
+            $name = $this->defaultName();
+        }
         $whatsapp = $this->sanitizeWhatsapp($payload['whatsapp'] ?? '');
         $observation = $this->sanitizeNullableString($payload['observation'] ?? null);
 
         $errors = [];
-        if ($name === '') {
-            $errors[] = [
-                'field' => 'name',
-                'message' => 'Nome obrigatorio.',
-            ];
-        }
-
         if ($whatsapp === '') {
             $errors[] = [
                 'field' => 'whatsapp',
@@ -165,7 +157,10 @@ final class BlacklistService
             $updates = [];
 
             $currentName = $this->sanitizeString($existing['name'] ?? '');
-            if ($name !== '' && $name !== $currentName) {
+            if ($currentName === '') {
+                $currentName = $this->defaultName();
+            }
+            if ($name !== $currentName) {
                 $updates['name'] = $name;
             }
 
@@ -238,7 +233,8 @@ final class BlacklistService
         $updates = [];
 
         if (array_key_exists('name', $payload)) {
-            $updates['name'] = $this->sanitizeString($payload['name']);
+            $name = $this->sanitizeString($payload['name']);
+            $updates['name'] = $name !== '' ? $name : $this->defaultName();
         }
 
         if (array_key_exists('whatsapp', $payload)) {
@@ -287,6 +283,11 @@ final class BlacklistService
         }
 
         return $this->repository->delete($id);
+    }
+
+    private function defaultName(): string
+    {
+        return 'Contato sem nome';
     }
 
     /**

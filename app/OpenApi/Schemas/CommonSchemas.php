@@ -98,8 +98,8 @@ use OpenApi\Annotations as OA;
  * @OA\Schema(
  *     schema="BlacklistCreatePayload",
  *     type="object",
- *     required={"name","whatsapp"},
- *     @OA\Property(property="name", type="string", example="Cliente Bloqueado"),
+ *     required={"whatsapp"},
+ *     @OA\Property(property="name", type="string", nullable=true, example="Cliente Bloqueado", description="Opcional. Se ausente, um nome padrao sera atribuido."),
  *     @OA\Property(property="whatsapp", type="string", example="5511999999999"),
  *     @OA\Property(property="has_closed_order", type="boolean", description="Marca se o contato possui pedido fechado.", example=false),
  *     @OA\Property(property="observation", type="string", nullable=true, example="Observaï¿½ï¿½o opcional")

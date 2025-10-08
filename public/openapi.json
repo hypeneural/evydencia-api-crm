@@ -3731,13 +3731,14 @@
             },
             "BlacklistCreatePayload": {
                 "required": [
-                    "name",
                     "whatsapp"
                 ],
                 "properties": {
                     "name": {
+                        "description": "Opcional. Se ausente, um nome padrao sera atribuido.",
                         "type": "string",
-                        "example": "Cliente Bloqueado"
+                        "example": "Cliente Bloqueado",
+                        "nullable": true
                     },
                     "whatsapp": {
                         "type": "string",
