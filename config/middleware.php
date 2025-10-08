@@ -44,6 +44,33 @@ return function (App $app): void {
         $allowedOrigins = ['*'];
     }
 
+    $allowLocalhost = (bool) ($corsSettings['allow_localhost'] ?? false);
+    $hasWildcardOrigin = in_array('*', $allowedOrigins, true);
+
+    if ($allowLocalhost && !$hasWildcardOrigin) {
+        $localhostOrigins = [
+            'http://localhost',
+            'https://localhost',
+            'http://127.0.0.1',
+            'https://127.0.0.1',
+        ];
+
+        $ports = $corsSettings['localhost_ports'] ?? [];
+        foreach ($ports as $port) {
+            $trimmed = trim((string) $port);
+            if ($trimmed === '') {
+                continue;
+            }
+
+            $localhostOrigins[] = sprintf('http://localhost:%s', $trimmed);
+            $localhostOrigins[] = sprintf('https://localhost:%s', $trimmed);
+            $localhostOrigins[] = sprintf('http://127.0.0.1:%s', $trimmed);
+            $localhostOrigins[] = sprintf('https://127.0.0.1:%s', $trimmed);
+        }
+
+        $allowedOrigins = array_values(array_unique(array_merge($allowedOrigins, $localhostOrigins)));
+    }
+
     $corsOptions = [
         'origin' => $allowedOrigins,
         'methods' => $corsSettings['allowed_methods'] ?? ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

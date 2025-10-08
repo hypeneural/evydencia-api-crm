@@ -2,9 +2,15 @@
 
 declare(strict_types=1);
 
+<?php
+
+declare(strict_types=1);
+
+$appEnv = $_ENV['APP_ENV'] ?? 'production';
+
 return [
     'app' => [
-        'env' => $_ENV['APP_ENV'] ?? 'production',
+        'env' => $appEnv,
         'debug' => filter_var($_ENV['APP_DEBUG'] ?? false, FILTER_VALIDATE_BOOL),
         'timezone' => $_ENV['APP_TIMEZONE'] ?? 'UTC',
         'url' => rtrim($_ENV['APP_URL'] ?? 'http://localhost', '/'),
@@ -100,6 +106,11 @@ return [
         'exposed_headers' => array_filter(array_map('trim', explode(',', $_ENV['CORS_EXPOSED_HEADERS'] ?? 'Link,X-RateLimit-Limit,X-RateLimit-Remaining,X-RateLimit-Reset,Trace-Id'))),
         'allow_credentials' => filter_var($_ENV['CORS_ALLOW_CREDENTIALS'] ?? false, FILTER_VALIDATE_BOOL),
         'max_age' => (int) ($_ENV['CORS_MAX_AGE'] ?? 86400),
+        'allow_localhost' => filter_var(
+            $_ENV['CORS_ALLOW_LOCALHOST'] ?? ($appEnv !== 'production' ? 'true' : 'false'),
+            FILTER_VALIDATE_BOOL
+        ),
+        'localhost_ports' => array_filter(array_map('trim', explode(',', $_ENV['CORS_LOCALHOST_PORTS'] ?? '3000,4200,5173,8080,8000'))),
     ],
     'openapi' => [
         'spec_path' => dirname(__DIR__) . '/public/openapi.json',
