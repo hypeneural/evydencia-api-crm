@@ -131,6 +131,95 @@ final class BlacklistService
         return ['resource' => $resource, 'created' => true];
     }
 
+    /**
+     * @param array<string, mixed> $payload
+     * @return array{resource: array<string, mixed>, created: bool, updated: bool}
+     */
+    public function ensureClosedOrderEntry(array $payload, string $traceId): array
+    {
+        $name = $this->sanitizeString($payload['name'] ?? '');
+        $whatsapp = $this->sanitizeWhatsapp($payload['whatsapp'] ?? '');
+        $observation = $this->sanitizeNullableString($payload['observation'] ?? null);
+
+        $errors = [];
+        if ($name === '') {
+            $errors[] = [
+                'field' => 'name',
+                'message' => 'Nome obrigatorio.',
+            ];
+        }
+
+        if ($whatsapp === '') {
+            $errors[] = [
+                'field' => 'whatsapp',
+                'message' => 'Whatsapp obrigatorio.',
+            ];
+        }
+
+        if ($errors !== []) {
+            throw new ValidationException($errors);
+        }
+
+        $existing = $this->repository->findByWhatsapp($whatsapp);
+        if ($existing !== null) {
+            $updates = [];
+
+            $currentName = $this->sanitizeString($existing['name'] ?? '');
+            if ($name !== '' && $name !== $currentName) {
+                $updates['name'] = $name;
+            }
+
+            $currentHasClosedOrder = (bool) ($existing['has_closed_order'] ?? false);
+            if (!$currentHasClosedOrder) {
+                $updates['has_closed_order'] = true;
+            }
+
+            if (
+                $observation !== null
+                && $observation !== ''
+                && $this->sanitizeNullableString($existing['observation'] ?? null) === null
+            ) {
+                $updates['observation'] = $observation;
+            }
+
+            if ($updates === []) {
+                return [
+                    'resource' => $existing,
+                    'created' => false,
+                    'updated' => false,
+                ];
+            }
+
+            $resource = $this->repository->update((int) $existing['id'], $updates);
+            if ($resource === null) {
+                throw new RuntimeException('Falha ao atualizar registro na blacklist.');
+            }
+
+            return [
+                'resource' => $resource,
+                'created' => false,
+                'updated' => true,
+            ];
+        }
+
+        $resource = $this->repository->create([
+            'name' => $name,
+            'whatsapp' => $whatsapp,
+            'has_closed_order' => true,
+            'observation' => $observation,
+        ]);
+
+        if (!isset($resource['id'])) {
+            throw new RuntimeException('Falha ao criar registro na blacklist.');
+        }
+
+        return [
+            'resource' => $resource,
+            'created' => true,
+            'updated' => false,
+        ];
+    }
+
     public function get(int $id): ?array
     {
         return $this->repository->findById($id);

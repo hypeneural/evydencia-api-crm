@@ -575,6 +575,48 @@
                 }
             }
         },
+        "/v1/blacklist/christmas-orders/sync": {
+            "post": {
+                "tags": [
+                    "Blacklist"
+                ],
+                "summary": "Sincroniza clientes com pedidos de Natal",
+                "description": "Consulta o CRM Evydencia para clientes com pedido de Natal fechado e garante que estejam na blacklist local.",
+                "operationId": "5c7871fd8b8c63a36674f5a8ede76b16",
+                "responses": {
+                    "200": {
+                        "description": "Sincronização concluída",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BlacklistSyncChristmasOrdersResponse"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Falha ao consultar o CRM",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/v1/campaigns/schedule/{id}/abort": {
             "post": {
                 "tags": [
@@ -865,6 +907,59 @@
                     }
                 },
                 "security": []
+            }
+        },
+        "/v1/orders/{uuid}/label": {
+            "get": {
+                "tags": [
+                    "Labels"
+                ],
+                "summary": "Gera a etiqueta do pedido",
+                "operationId": "8c89dd32d2e34358b55a173058cc1f54",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Identificador do pedido no CRM.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Etiqueta gerada com sucesso",
+                        "content": {
+                            "image/png": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parametros invalidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "/v1/orders/{uuid}": {
@@ -3616,7 +3711,10 @@
                 "properties": {
                     "status": {
                         "type": "string",
-                        "example": "paid"
+                        "enum": [
+                            "waiting_product_retrieve"
+                        ],
+                        "example": "waiting_product_retrieve"
                     },
                     "note": {
                         "type": "string",
@@ -4709,6 +4807,77 @@
                     }
                 ]
             },
+            "BlacklistSyncChristmasOrdersPayload": {
+                "required": [
+                    "total_crm_customers",
+                    "inserted",
+                    "updated",
+                    "skipped",
+                    "invalid",
+                    "failures"
+                ],
+                "properties": {
+                    "total_crm_customers": {
+                        "type": "integer",
+                        "example": 125
+                    },
+                    "inserted": {
+                        "type": "integer",
+                        "example": 42
+                    },
+                    "updated": {
+                        "type": "integer",
+                        "example": 18
+                    },
+                    "skipped": {
+                        "type": "integer",
+                        "example": 65
+                    },
+                    "invalid": {
+                        "type": "integer",
+                        "example": 5
+                    },
+                    "failures": {
+                        "type": "array",
+                        "items": {
+                            "properties": {
+                                "index": {
+                                    "type": "integer",
+                                    "example": 3
+                                },
+                                "reason": {
+                                    "type": "string",
+                                    "example": "Dados incompletos ou whatsapp invalido."
+                                },
+                                "errors": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/ErrorDetail"
+                                    },
+                                    "nullable": true
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "BlacklistSyncChristmasOrdersResponse": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/SuccessEnvelope"
+                    },
+                    {
+                        "properties": {
+                            "data": {
+                                "$ref": "#/components/schemas/BlacklistSyncChristmasOrdersPayload"
+                            }
+                        },
+                        "type": "object"
+                    }
+                ]
+            },
             "ScheduledPostListResponse": {
                 "allOf": [
                     {
@@ -5085,6 +5254,10 @@
         {
             "name": "Orders",
             "description": "CRM order search and lifecycle operations"
+        },
+        {
+            "name": "Labels",
+            "description": "Geracao de etiquetas para pedidos"
         },
         {
             "name": "WhatsApp",

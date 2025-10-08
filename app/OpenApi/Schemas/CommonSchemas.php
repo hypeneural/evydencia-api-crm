@@ -515,6 +515,40 @@ use OpenApi\Annotations as OA;
  * )
  *
  * @OA\Schema(
+ *     schema="BlacklistSyncChristmasOrdersPayload",
+ *     type="object",
+ *     required={"total_crm_customers","inserted","updated","skipped","invalid","failures"},
+ *     @OA\Property(property="total_crm_customers", type="integer", example=125),
+ *     @OA\Property(property="inserted", type="integer", example=42),
+ *     @OA\Property(property="updated", type="integer", example=18),
+ *     @OA\Property(property="skipped", type="integer", example=65),
+ *     @OA\Property(property="invalid", type="integer", example=5),
+ *     @OA\Property(
+ *         property="failures",
+ *         type="array",
+ *         @OA\Items(
+ *             type="object",
+ *             @OA\Property(property="index", type="integer", example=3),
+ *             @OA\Property(property="reason", type="string", example="Dados incompletos ou whatsapp invalido."),
+ *             @OA\Property(
+ *                 property="errors",
+ *                 type="array",
+ *                 nullable=true,
+ *                 @OA\Items(ref="#/components/schemas/ErrorDetail")
+ *             )
+ *         )
+ *     )
+ * )
+ *
+ * @OA\Schema(
+ *     schema="BlacklistSyncChristmasOrdersResponse",
+ *     allOf={
+ *         @OA\Schema(ref="#/components/schemas/SuccessEnvelope"),
+ *         @OA\Schema(@OA\Property(property="data", ref="#/components/schemas/BlacklistSyncChristmasOrdersPayload"))
+ *     }
+ * )
+ *
+ * @OA\Schema(
  *     schema="ScheduledPostListResponse",
  *     allOf={
  *         @OA\Schema(ref="#/components/schemas/SuccessEnvelope"),

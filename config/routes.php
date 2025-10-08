@@ -6,6 +6,7 @@ use App\Actions\Blacklist\CreateBlacklistEntryAction;
 use App\Actions\Blacklist\DeleteBlacklistEntryAction;
 use App\Actions\Blacklist\GetBlacklistEntryAction;
 use App\Actions\Blacklist\ListBlacklistAction;
+use App\Actions\Blacklist\SyncChristmasOrdersAction;
 use App\Actions\Blacklist\UpdateBlacklistEntryAction;
 use App\Actions\Campaigns\AbortScheduledCampaignAction;
 use App\Actions\Campaigns\GetCampaignScheduleAction;
@@ -63,6 +64,7 @@ return function (App $app): void {
             $blacklist->get('/{id}', GetBlacklistEntryAction::class);
             $blacklist->map(['PUT', 'PATCH'], '/{id}', UpdateBlacklistEntryAction::class);
             $blacklist->delete('/{id}', DeleteBlacklistEntryAction::class);
+            $blacklist->post('/christmas-orders/sync', SyncChristmasOrdersAction::class);
         });
 
         $group->group('/scheduled-posts', function (RouteCollectorProxy $scheduled): void {
