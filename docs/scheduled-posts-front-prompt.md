@@ -4,6 +4,8 @@ Use este prompt como guia completo para implementar o consumo de todos os endpoi
 
 ---
 
+> Para um checklist aprofundado de boas práticas (cache ETag, observabilidade, hooks recomendados), veja também `docs/frontend-scheduled-posts-guide.md`.
+
 ## 1. Contexto Geral
 - **Base URL**: `https://api.evydencia.com.br`
 - **Ambiente local**: `http://localhost:8080/api`
@@ -21,6 +23,7 @@ Use este prompt como guia completo para implementar o consumo de todos os endpoi
   - `422` contém `error.errors[]` com `field` + `message` (mapear para inputs).
   - `502` indica falha ao disparar via Z-API (exibir mensagem amigável e permitir retry).
   - `trace_id` sempre presente → logar no DevTools para debugar.
+- **Cache condicional**: `GET /v1/scheduled-posts` devolve `ETag`; reenviar em `If-None-Match` evita download completo quando não houver mudanças.
 
 ---
 
@@ -45,10 +48,11 @@ Use este prompt como guia completo para implementar o consumo de todos os endpoi
    - Em caso de falha de envio imediato (`502`), exibir alerta e permitir reprocessar via worker/ação manual.
 
 4. **Listagem / Monitoramento**  
-   - `GET /v1/scheduled-posts` com paginação, filtros e ordenação.  
+   - `GET /v1/scheduled-posts` com paginação, filtros e ordenação (ver parâmetros em §3.3).  
    - Consumir `meta.filters_applied` para exibir chips ativos.  
    - `available_filters` devolve listas (`types`, `statuses`) para popular dropdowns.  
-   - Usar `links.next/prev` ou paginação local com `page`/`per_page`.
+   - Usar `links.next/prev` ou paginação local com `page`/`per_page`.  
+   - Salvar `ETag` retornado e enviar em `If-None-Match` no próximo fetch para aproveitar respostas `304`.
 
 5. **Despacho manual**  
    - Botão “Processar agora” chama `POST /v1/scheduled-posts/bulk/dispatch` com `ids` selecionados.  
@@ -112,35 +116,41 @@ Body (multipart):
 Parâmetros suportados:
 - `page`, `per_page` (1–200)
 - `fetch=all`
+- `fields=id,type,...` para reduzir payload
 - `sort[field]`, `sort[direction]` ou `sort=-scheduled_datetime`
-- `search=<texto>`
-- `filters[type]=text|image|video`
-- `filters[status]=pending|scheduled|sent|failed`
-- `filters[scheduled_datetime][gte|lte]=...`
-- `filters[created_at][gte|lte]=...`
-- `filters[has_media]=true|false`
-- `filters[caption_contains]=...`
-- `filters[scheduled_today]=true`
-- `filters[scheduled_this_week]=true`
-- `filters[message_id_state]=null|not_null` (legacy)
+- `q=<texto>` (search em mensagem/caption)
+- `filter[type]=text|image|video`
+- `filter[status]=pending|scheduled|sent|failed`
+- `filter[scheduled_datetime][gte|lte]=...` (atalhos `_gte/_lte` também aceitos)
+- `filter[created_at][gte|lte]=...`
+- `filter[has_media]=true|false`
+- `filter[caption_contains]=...`
+- `filter[scheduled_today]=true`
+- `filter[scheduled_this_week]=true`
+- `filter[message_id_state]=null|not_null`
+- `filter[messageId]=...`
 
 Usar dados do envelope:
 - `data[]` com registros (inclui flag `has_media`).
-- `meta.page/per_page/count/total/total_pages/source`.
+- `meta.page/per_page/count/total/total_pages/source/elapsed_ms`.
 - `meta.filters_applied` → renderizar filtros ativos.
 - `meta.available_filters` → tipos e statuses possíveis.
 - `links.self/next/prev` → paginação baseada em URLs.
+- Headers: `X-Total-Count`, `X-Request-Id` e `ETag` (guarde para usar em `If-None-Match`).
 
 ### 3.4 Métricas / KPIs (`GET /v1/scheduled-posts/analytics`)
-- Mesmos filtros da listagem.  
-- `data.summary`: totals (total, sent, pending, scheduled, failed).  
-- `success_rate`: porcentagem (sent/total).  
-- `by_type`: distribuição por `text|image|video`.  
-- `by_date`: últimos 30 buckets por dia com contagem `sent|scheduled|failed`.  
-- `recent_activity`: `last_sent`, `last_created`, `sent_last_30min`, `sent_today`.  
-- `upcoming`: `next_hour`, `next_24h`, `next_7days`.  
-- `performance`: tempos médios em segundos (`avg_delivery_time_seconds`, `avg_processing_time_seconds`).  
-- `meta.filters_applied`/`available_filters` idênticos à listagem.
+- Mesmos filtros/paginação da listagem (inclusive `fields`, `sort`, `fetch=all`).  
+- `data.summary`: `{ total, sent, pending, scheduled, failed }`.  
+- `success_rate`: porcentagem (0.0 quando não houver amostra).  
+- `by_type`: `{ text, image, video }`.  
+- `by_date[]`: até 30 buckets `{ date, sent, scheduled, failed }` (ordenar no front).  
+- `recent_activity`: `{ last_sent, last_created, sent_last_30min, sent_today }`.  
+- `upcoming`: `{ next_hour, next_24h, next_7days }`.  
+- `performance`: `{ avg_delivery_time_seconds, avg_processing_time_seconds }`.  
+- `meta.filters_applied` / `meta.available_filters` iguais aos da listagem.  
+- Em erro 500 o backend devolve `internal_error` com mensagem “Nao foi possivel carregar os indicadores.” + `trace_id` — logue e ofereça retry.
+
+> Observacao: endpoints com `{id}` usam o padrão `{id:[0-9]+}` — garanta que a UI só dispare chamadas com IDs inteiros válidos.
 
 ### 3.5 Atualizar (`PATCH /v1/scheduled-posts/{id}`)
 - Enviar somente campos alterados.  
@@ -320,4 +330,3 @@ Usar dados do envelope:
 
 ### Prompt rápido (resumido)
 > “Implemente um front-end para agendamentos de status do WhatsApp consumindo a API em `https://api.evydencia.com.br`. Toda requisição deve incluir `X-API-Key`. Siga o fluxo: upload opcional (`POST /v1/scheduled-posts/media/upload`), criação (`POST /v1/scheduled-posts`), listagem com filtros avançados (`GET /v1/scheduled-posts`), dashboards (`GET /v1/scheduled-posts/analytics`), operações em massa (`/bulk` delete/update/dispatch) e duplicação (`POST /v1/scheduled-posts/{id}/duplicate`). Converta datas para `YYYY-MM-DD HH:MM:SS` em timezone São Paulo. Trate envelopes `success/error`, exiba mensagens por campo em `422`, e use `meta.filters_applied`/`available_filters` para UI. Após mutações, recarregue lista e analytics. Registre `trace_id` no console para debug.”
-

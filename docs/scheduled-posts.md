@@ -4,6 +4,8 @@ Use this document as a ready-to-drop “prompt” inside VibeCoding/Cursor or to
 
 ---
 
+> Consulte também `docs/frontend-scheduled-posts-guide.md` para recomendações detalhadas de consumo no front-end (caching, observabilidade, fluxos e checklist de robustez).
+
 ## 1. High-Level Architecture
 
 - **Base URL:** `https://api.evydencia.com.br`
@@ -129,21 +131,18 @@ GET /v1/scheduled-posts?page=1&per_page=15&sort[field]=scheduled_datetime&sort[d
 Headers:
   X-API-Key: <key>
   Trace-Id: <optional>
+  If-None-Match: "etag-da-ultima-resposta"  # opcional, ativa 304
 ```
 
-**Filters**
-- `filters[type]=image`
-- `filters[status]=pending` (`pending|scheduled|sent|failed`)
-- `filters[scheduled_datetime][gte]=2025-10-01 00:00:00`
-- `filters[scheduled_datetime][lte]=2025-10-31 23:59:59`
-- `filters[created_at][gte]=2025-10-01 00:00:00`
-- `filters[created_at][lte]=2025-10-31 23:59:59`
-- `filters[has_media]=true` (boolean)
-- `filters[caption_contains]=Black Friday`
-- `filters[scheduled_today]=true` (shortcut for `DATE(scheduled_datetime) = CURDATE()`)
-- `filters[scheduled_this_week]=true` (ISO week helper)
-- `filters[message_id_state]=null` (`null` vs `not_null` – legacy alias)
-- `search=<text>` (searches `message` or `caption`)
+**Query parameters aceitos**
+
+- `page` (≥1) e `per_page` (1–200).  
+- `sort[field]`, `sort[direction]` (`asc|desc`) ou string `scheduled_datetime,-id`.  
+- `fetch=all` para remover limites de paginação (use com cuidado).  
+- `fields=id,type,scheduled_datetime` para respostas enxutas.  
+- `q=<texto>` busca em `message` e `caption`.  
+- Filtros (`filter[...]`): `type`, `status`, `scheduled_datetime[g|l]te`, `created_at[g|l]te`, `has_media`, `caption_contains`, `scheduled_today`, `scheduled_this_week`, `message_id_state`, `messageId`. Versões planas `_gte/_lte` também são aceitas.  
+- Valores booleanos aceitam `true|false|1|0`; `message_id_state` aceita `null` e `not_null`.
 
 **Response excerpt**
 ```json
@@ -172,6 +171,7 @@ Headers:
     "total": 8,
     "total_pages": 1,
     "source": "api",
+    "elapsed_ms": 42,
     "filters_applied": {
       "type": "image",
       "status": "pending",
@@ -188,6 +188,18 @@ Headers:
   "trace_id": "..."
 }
 ```
+
+**Cabeçalhos de resposta**
+
+- `X-Total-Count` com total geral.  
+- `X-Request-Id` (mesmo valor de `trace_id`).  
+- `ETag` + `Cache-Control: private, max-age=60` quando cacheável.
+
+**Tratamento de erros**
+
+- `304 Not Modified`: nenhum corpo, reaproveite cache local.  
+- `422 Unprocessable Entity`: campos detalhados em `error.errors[]`.  
+- `500 Internal Error`: logue `trace_id` e mostre fallback com ação de retry.
 
 ### 5.2 Create – `POST /v1/scheduled-posts`
 
@@ -246,6 +258,7 @@ GET /v1/scheduled-posts/123
 **Status**
 - `200` with resource.
 - `404` if not found.
+> Observacao: endpoints com `{id}` adotam `{id:[0-9]+}` para evitar colisoes com rotas como `/analytics`.
 
 ### 5.4 Update – `PUT /v1/scheduled-posts/{id}` or `PATCH`
 
@@ -305,9 +318,17 @@ Described in Section 4; always required when a new media file is picked.
 Provide ready-to-consume KPIs (counts, success rate, upcoming workload) for dashboards without recalculating on the client.
 
 **Highlights**
-- Accepts the same filter/query parameters as the list endpoint.
-- Returns grouped metrics: `summary`, `success_rate`, `by_type`, `by_date` (last 30 buckets), `recent_activity`, `upcoming`, `performance`.
-- `meta.filters_applied` + `meta.available_filters` mirror the list endpoint.
+- Aceita os mesmos filtros/paginações da listagem (incluindo `fetch=all`, `fields`, `sort` e `filter[...]`).  
+- Métricas retornadas:  
+  - `summary.{total,sent,pending,scheduled,failed}`.  
+  - `success_rate` (float com 1 casa; 0.0 quando não há amostras).  
+  - `by_type.{text,image,video}`.  
+  - `by_date[]` (até 30 linhas, cada uma com `date`, `sent`, `scheduled`, `failed`).  
+  - `recent_activity.{last_sent,last_created,sent_last_30min,sent_today}`.  
+  - `upcoming.{next_hour,next_24h,next_7days}`.  
+  - `performance.{avg_delivery_time_seconds,avg_processing_time_seconds}`.  
+- `meta.filters_applied` e `meta.available_filters` seguem exatamente o contrato da listagem para reaproveitar componentes de filtro.  
+- Falhas internas geram envelope `internal_error` com mensagem padrão “Nao foi possivel carregar os indicadores.” e `trace_id` para suporte.
 
 **Sample**
 ```json
