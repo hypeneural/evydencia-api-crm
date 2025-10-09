@@ -12,6 +12,8 @@ namespace App\Actions\ScheduledPosts;
 
 use App\Actions\Concerns\HandlesListAction;
 
+use App\Application\DTO\QueryOptions;
+
 use App\Application\Services\ScheduledPostService;
 
 use App\Application\Support\ApiResponder;

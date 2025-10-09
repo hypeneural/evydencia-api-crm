@@ -182,6 +182,10 @@ final class QueryMapper
             'gte' => 'scheduled_datetime_gte',
             'lte' => 'scheduled_datetime_lte',
         ],
+        'created_at' => [
+            'gte' => 'created_at_gte',
+            'lte' => 'created_at_lte',
+        ],
     ];
 
     private const CAMPAIGN_FILTERS = [
@@ -503,6 +507,41 @@ final class QueryMapper
             }
         }
 
+        if (isset($filters['status'])) {
+            $status = strtolower($this->sanitizeScalar($filters['status']));
+            if (in_array($status, ['pending', 'scheduled', 'sent', 'failed'], true)) {
+                $mapped['status'] = $status;
+            }
+        }
+
+        if (array_key_exists('has_media', $filters)) {
+            $flag = $this->normalizeBoolean($filters['has_media']);
+            if ($flag !== null) {
+                $mapped['has_media'] = $flag;
+            }
+        }
+
+        if (isset($filters['caption_contains'])) {
+            $caption = $this->sanitizeScalar($filters['caption_contains']);
+            if ($caption !== '') {
+                $mapped['caption_contains'] = $caption;
+            }
+        }
+
+        if (isset($filters['scheduled_today'])) {
+            $flag = $this->normalizeBoolean($filters['scheduled_today']);
+            if ($flag === true) {
+                $mapped['scheduled_today'] = true;
+            }
+        }
+
+        if (isset($filters['scheduled_this_week'])) {
+            $flag = $this->normalizeBoolean($filters['scheduled_this_week']);
+            if ($flag === true) {
+                $mapped['scheduled_this_week'] = true;
+            }
+        }
+
         foreach (self::SCHEDULED_POSTS_RANGE_FILTERS as $source => $operators) {
             if (isset($filters[$source]) && is_array($filters[$source])) {
                 foreach ($operators as $operator => $target) {
@@ -558,10 +597,29 @@ final class QueryMapper
 
         foreach (['scheduled_datetime_gte' => 'gte', 'scheduled_datetime_lte' => 'lte'] as $key => $operator) {
             if (array_key_exists($key, $params)) {
-                if (!isset($inline['scheduled_datetime'])) {
+                if (!isset($inline['scheduled_datetime']) || !is_array($inline['scheduled_datetime'])) {
                     $inline['scheduled_datetime'] = [];
                 }
                 $inline['scheduled_datetime'][$operator] = $params[$key];
+            }
+        }
+
+        if (isset($params['created_at']) && is_array($params['created_at'])) {
+            $inline['created_at'] = $params['created_at'];
+        }
+
+        foreach (['created_at_gte' => 'gte', 'created_at_lte' => 'lte'] as $key => $operator) {
+            if (array_key_exists($key, $params)) {
+                if (!isset($inline['created_at']) || !is_array($inline['created_at'])) {
+                    $inline['created_at'] = [];
+                }
+                $inline['created_at'][$operator] = $params[$key];
+            }
+        }
+
+        foreach (['status', 'has_media', 'caption_contains', 'scheduled_today', 'scheduled_this_week'] as $scalarKey) {
+            if (array_key_exists($scalarKey, $params) && !is_array($params[$scalarKey])) {
+                $inline[$scalarKey] = $params[$scalarKey];
             }
         }
 
@@ -1131,6 +1189,22 @@ final class QueryMapper
      */
     private function parseSort(mixed $sort): array
     {
+        if (is_array($sort)) {
+            $field = $this->sanitizeScalar($sort['field'] ?? null);
+            if ($field === '') {
+                return [];
+            }
+
+            $direction = strtolower($this->sanitizeScalar($sort['direction'] ?? 'asc')) === 'desc' ? 'desc' : 'asc';
+
+            return [
+                [
+                    'field' => $field,
+                    'direction' => $direction,
+                ],
+            ];
+        }
+
         if (!is_string($sort) || trim($sort) === '') {
             return [];
         }

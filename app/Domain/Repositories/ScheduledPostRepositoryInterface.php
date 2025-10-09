@@ -16,6 +16,12 @@ interface ScheduledPostRepositoryInterface
     public function findById(int $id): ?array;
 
     /**
+     * @param array<int, int> $ids
+     * @return array<int, array<string, mixed>>
+     */
+    public function findByIds(array $ids): array;
+
+    /**
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
@@ -33,6 +39,23 @@ interface ScheduledPostRepositoryInterface
      * @return array<int, array<string, mixed>>
      */
     public function findReady(int $limit): array;
+
+    /**
+     * @param array<int, int> $ids
+     */
+    public function deleteMany(array $ids): int;
+
+    /**
+     * @param array<int, int> $ids
+     * @param array<string, mixed> $payload
+     */
+    public function updateMany(array $ids, array $payload): int;
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<string, mixed>
+     */
+    public function analytics(array $filters, ?string $search): array;
 
     /**
      * @param array<string, mixed> $payload

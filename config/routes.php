@@ -20,9 +20,14 @@ use App\Actions\Orders\UpdateOrderStatusAction;
 use App\Actions\Reports\ExportReportAction;
 use App\Actions\Reports\ListReportsAction;
 use App\Actions\Reports\RunReportAction;
+use App\Actions\ScheduledPosts\BulkDeleteScheduledPostsAction;
+use App\Actions\ScheduledPosts\BulkDispatchScheduledPostsAction;
+use App\Actions\ScheduledPosts\BulkUpdateScheduledPostsAction;
 use App\Actions\ScheduledPosts\CreateScheduledPostAction;
 use App\Actions\ScheduledPosts\DeleteScheduledPostAction;
 use App\Actions\ScheduledPosts\DispatchScheduledPostsAction;
+use App\Actions\ScheduledPosts\DuplicateScheduledPostAction;
+use App\Actions\ScheduledPosts\GetScheduledPostAnalyticsAction;
 use App\Actions\ScheduledPosts\GetReadyScheduledPostsAction;
 use App\Actions\ScheduledPosts\GetScheduledPostAction;
 use App\Actions\ScheduledPosts\ListScheduledPostsAction;
@@ -71,14 +76,19 @@ return function (App $app): void {
 
         $group->group('/scheduled-posts', function (RouteCollectorProxy $scheduled): void {
             $scheduled->get('', ListScheduledPostsAction::class);
+            $scheduled->get('/analytics', GetScheduledPostAnalyticsAction::class);
             $scheduled->post('', CreateScheduledPostAction::class);
             $scheduled->get('/ready', GetReadyScheduledPostsAction::class);
             $scheduled->post('/media/upload', UploadScheduledPostMediaAction::class);
             $scheduled->post('/worker/dispatch', DispatchScheduledPostsAction::class);
+            $scheduled->delete('/bulk', BulkDeleteScheduledPostsAction::class);
+            $scheduled->patch('/bulk', BulkUpdateScheduledPostsAction::class);
+            $scheduled->post('/bulk/dispatch', BulkDispatchScheduledPostsAction::class);
             $scheduled->get('/{id}', GetScheduledPostAction::class);
             $scheduled->map(['PUT', 'PATCH'], '/{id}', UpdateScheduledPostAction::class);
             $scheduled->post('/{id}/mark-sent', MarkScheduledPostSentAction::class);
             $scheduled->delete('/{id}', DeleteScheduledPostAction::class);
+            $scheduled->post('/{id}/duplicate', DuplicateScheduledPostAction::class);
         });
 
         $group->get('/orders/search', SearchOrdersAction::class);

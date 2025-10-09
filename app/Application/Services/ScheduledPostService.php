@@ -19,6 +19,8 @@ use Throwable;
 final class ScheduledPostService
 {
     private const ALLOWED_TYPES = ['text', 'image', 'video'];
+    private const STATUS_VALUES = ['pending', 'scheduled', 'sent', 'failed'];
+    private const BULK_UPDATABLE_FIELDS = ['scheduled_datetime', 'caption'];
     private const READY_DEFAULT_LIMIT = 50;
 
     public function __construct(
@@ -61,6 +63,8 @@ final class ScheduledPostService
             'total' => $total,
             'total_pages' => $totalPages,
             'source' => 'api',
+            'filters_applied' => $this->buildFiltersApplied($filters),
+            'available_filters' => $this->resolveAvailableFilters(),
         ];
 
         return [
@@ -194,6 +198,201 @@ final class ScheduledPostService
             ],
             'items' => $results,
         ];
+    }
+
+    public function analytics(QueryOptions $options): array
+    {
+        $criteria = $options->crmQuery;
+        $filters = is_array($criteria['filters'] ?? null) ? $criteria['filters'] : [];
+        $search = isset($criteria['search']) && is_string($criteria['search']) ? trim($criteria['search']) : null;
+
+        $result = $this->repository->analytics($filters, $search);
+        $result['filters_applied'] = $this->buildFiltersApplied($filters);
+        $result['available_filters'] = $this->resolveAvailableFilters();
+
+        return $result;
+    }
+
+    /**
+     * @param array<int, mixed> $ids
+     * @return array{deleted: int, failed: int, errors: array<int, array<string, mixed>>}
+     */
+    public function bulkDelete(array $ids): array
+    {
+        $normalizedIds = $this->normalizeIds($ids);
+        if ($normalizedIds === []) {
+            return [
+                'deleted' => 0,
+                'failed' => 0,
+                'errors' => [],
+            ];
+        }
+
+        $existing = $this->repository->findByIds($normalizedIds);
+        $existingIds = array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $existing);
+        $existingIds = array_values(array_filter($existingIds, static fn (int $value): bool => $value > 0));
+        $missing = array_values(array_diff($normalizedIds, $existingIds));
+
+        if ($existingIds === []) {
+            return [
+                'deleted' => 0,
+                'failed' => count($missing),
+                'errors' => $this->mapMissingErrors($missing),
+            ];
+        }
+
+        $deleted = $this->repository->deleteMany($existingIds);
+        if ($deleted > 0) {
+            $this->cache->invalidate();
+        }
+
+        return [
+            'deleted' => $deleted,
+            'failed' => count($missing),
+            'errors' => $this->mapMissingErrors($missing),
+        ];
+    }
+
+    /**
+     * @param array<int, mixed> $ids
+     * @param array<string, mixed> $updates
+     * @return array{updated: int, failed: int, errors: array<int, array<string, mixed>>}
+     */
+    public function bulkUpdate(array $ids, array $updates): array
+    {
+        $normalizedIds = $this->normalizeIds($ids);
+        if ($normalizedIds === []) {
+            return [
+                'updated' => 0,
+                'failed' => 0,
+                'errors' => [],
+            ];
+        }
+
+        $payload = $this->sanitizeBulkUpdates($updates);
+
+        $existing = $this->repository->findByIds($normalizedIds);
+        $existingIds = array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $existing);
+        $existingIds = array_values(array_filter($existingIds, static fn (int $value): bool => $value > 0));
+        $missing = array_values(array_diff($normalizedIds, $existingIds));
+
+        if ($existingIds === []) {
+            return [
+                'updated' => 0,
+                'failed' => count($missing),
+                'errors' => $this->mapMissingErrors($missing),
+            ];
+        }
+
+        $updated = $this->repository->updateMany($existingIds, $payload);
+        if ($updated > 0) {
+            $this->cache->invalidate();
+        }
+
+        return [
+            'updated' => $updated,
+            'failed' => count($missing),
+            'errors' => $this->mapMissingErrors($missing),
+        ];
+    }
+
+    /**
+     * @param array<int, mixed> $ids
+     * @return array{
+     *     summary: array<string, int>,
+     *     items: array<int, array<string, mixed>>,
+     *     errors: array<int, array<string, mixed>>
+     * }
+     */
+    public function bulkDispatch(array $ids, string $traceId): array
+    {
+        $normalizedIds = $this->normalizeIds($ids);
+        if ($normalizedIds === []) {
+            return [
+                'summary' => [
+                    'requested' => 0,
+                    'processed' => 0,
+                    'sent' => 0,
+                    'failed' => 0,
+                    'skipped' => 0,
+                    'missing' => 0,
+                ],
+                'items' => [],
+                'errors' => [],
+            ];
+        }
+
+        $existing = $this->repository->findByIds($normalizedIds);
+        $posts = [];
+        foreach ($existing as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                $posts[$id] = $row;
+            }
+        }
+
+        $missing = array_values(array_diff($normalizedIds, array_keys($posts)));
+
+        $results = [];
+        $sent = 0;
+        $failed = 0;
+        $skipped = 0;
+
+        foreach ($posts as $post) {
+            $dispatch = $this->dispatchSingle($post, $traceId);
+            $status = $dispatch['status'] ?? 'failed';
+
+            if ($status === 'sent') {
+                $sent++;
+            } elseif ($status === 'skipped') {
+                $skipped++;
+            } else {
+                $failed++;
+            }
+
+            $results[] = $this->prepareDispatchOutput($dispatch);
+        }
+
+        return [
+            'summary' => [
+                'requested' => count($normalizedIds),
+                'processed' => count($posts),
+                'sent' => $sent,
+                'failed' => $failed,
+                'skipped' => $skipped,
+                'missing' => count($missing),
+            ],
+            'items' => $results,
+            'errors' => $this->mapMissingErrors($missing),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $overrides
+     * @return array<string, mixed>
+     */
+    public function duplicate(int $id, array $overrides, string $traceId): array
+    {
+        $original = $this->repository->findById($id);
+        if ($original === null) {
+            throw new NotFoundException('Agendamento nao encontrado.');
+        }
+
+        $payload = [
+            'type' => $original['type'] ?? null,
+            'message' => $original['message'] ?? null,
+            'image_url' => $original['image_url'] ?? null,
+            'video_url' => $original['video_url'] ?? null,
+            'caption' => $original['caption'] ?? null,
+            'scheduled_datetime' => $original['scheduled_datetime'] ?? null,
+        ];
+
+        $payload = $this->applyDuplicateOverrides($payload, $overrides);
+
+        $resource = $this->create($payload, $traceId);
+        $resource['original_id'] = $id;
+
+        return $resource;
     }
 
     /**
@@ -420,6 +619,203 @@ final class ScheduledPostService
             $output,
             static fn ($value) => $value !== null && $value !== ''
         );
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<string, mixed>
+     */
+    private function buildFiltersApplied(array $filters): array
+    {
+        $recognized = [
+            'type',
+            'status',
+            'scheduled_datetime_gte',
+            'scheduled_datetime_lte',
+            'created_at_gte',
+            'created_at_lte',
+            'has_media',
+            'caption_contains',
+            'scheduled_today',
+            'scheduled_this_week',
+            'message_id_state',
+        ];
+
+        $applied = [];
+        foreach ($recognized as $key) {
+            if (!array_key_exists($key, $filters)) {
+                continue;
+            }
+
+            $value = $filters[$key];
+            if ($value === null || $value === '' || $value === []) {
+                continue;
+            }
+
+            $applied[$key] = $value;
+        }
+
+        return $applied;
+    }
+
+    /**
+     * @return array<string, array<int, string>>
+     */
+    private function resolveAvailableFilters(): array
+    {
+        return [
+            'types' => self::ALLOWED_TYPES,
+            'statuses' => self::STATUS_VALUES,
+        ];
+    }
+
+    /**
+     * @param array<int, mixed> $ids
+     * @return array<int, int>
+     */
+    private function normalizeIds(array $ids): array
+    {
+        $normalized = [];
+        foreach ($ids as $id) {
+            if (is_numeric($id)) {
+                $value = (int) $id;
+                if ($value > 0) {
+                    $normalized[] = $value;
+                }
+            }
+        }
+
+        return array_values(array_unique($normalized));
+    }
+
+    /**
+     * @param array<int, int> $missing
+     * @return array<int, array<string, mixed>>
+     */
+    private function mapMissingErrors(array $missing): array
+    {
+        return array_map(
+            static fn (int $id): array => [
+                'id' => $id,
+                'message' => 'Agendamento nao encontrado.',
+            ],
+            $missing
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $updates
+     * @return array<string, mixed>
+     */
+    private function sanitizeBulkUpdates(array $updates): array
+    {
+        if ($updates === []) {
+            throw new ValidationException([
+                ['field' => 'updates', 'message' => 'Informe ao menos um campo para atualizacao.'],
+            ]);
+        }
+
+        $payload = [];
+        $errors = [];
+
+        foreach ($updates as $field => $value) {
+            if (!in_array($field, self::BULK_UPDATABLE_FIELDS, true)) {
+                $errors[] = [
+                    'field' => (string) $field,
+                    'message' => 'Campo nao permitido em atualizacao em lote.',
+                ];
+                continue;
+            }
+
+            if ($field === 'scheduled_datetime') {
+                $sanitized = $this->sanitizeDateTime($value);
+                if ($sanitized === null) {
+                    $errors[] = [
+                        'field' => 'scheduled_datetime',
+                        'message' => 'Data de agendamento invalida.',
+                    ];
+                    continue;
+                }
+                $payload['scheduled_datetime'] = $sanitized;
+                continue;
+            }
+
+            if ($field === 'caption') {
+                $payload['caption'] = $this->sanitizeOptionalString($value);
+            }
+        }
+
+        if ($errors !== []) {
+            throw new ValidationException($errors);
+        }
+
+        if ($payload === []) {
+            throw new ValidationException([
+                ['field' => 'updates', 'message' => 'Nenhum campo valido informado para atualizacao.'],
+            ]);
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @param array<string, mixed> $overrides
+     * @return array<string, mixed>
+     */
+    private function applyDuplicateOverrides(array $payload, array $overrides): array
+    {
+        if ($overrides === []) {
+            return $payload;
+        }
+
+        $errors = [];
+
+        foreach ($overrides as $field => $value) {
+            switch ($field) {
+                case 'scheduled_datetime':
+                    $sanitized = $this->sanitizeDateTime($value);
+                    if ($sanitized === null) {
+                        $errors[] = ['field' => 'scheduled_datetime', 'message' => 'Data de agendamento invalida.'];
+                        continue 2;
+                    }
+                    $payload['scheduled_datetime'] = $sanitized;
+                    break;
+                case 'caption':
+                    $payload['caption'] = $this->sanitizeOptionalString($value);
+                    break;
+                case 'message':
+                    $payload['message'] = $this->sanitizeOptionalString($value);
+                    break;
+                case 'type':
+                    if (!is_string($value)) {
+                        $errors[] = ['field' => 'type', 'message' => 'Tipo invalido.'];
+                        continue 2;
+                    }
+                    $type = strtolower(trim($value));
+                    if (!in_array($type, self::ALLOWED_TYPES, true)) {
+                        $errors[] = ['field' => 'type', 'message' => 'Tipo invalido.'];
+                        continue 2;
+                    }
+                    $payload['type'] = $type;
+                    break;
+                case 'image_url':
+                    $payload['image_url'] = $this->sanitizeOptionalString($value);
+                    break;
+                case 'video_url':
+                    $payload['video_url'] = $this->sanitizeOptionalString($value);
+                    break;
+                default:
+                    // ignore unknown fields
+                    break;
+            }
+        }
+
+        if ($errors !== []) {
+            throw new ValidationException($errors);
+        }
+
+        return $payload;
     }
 
     private function finalizeSent(int $id, ?string $zaapId, string $messageId): array

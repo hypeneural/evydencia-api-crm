@@ -133,11 +133,26 @@ Headers:
 
 **Filters**
 - `filters[type]=image`
-- `filters[scheduled_datetime_gte]=2025-10-01 00:00:00`
-- `filters[scheduled_datetime_lte]=2025-10-31 23:59:59`
-- `filters[message_id_state]=null` (`null` vs `not_null`)
+- `filters[status]=pending` (`pending|scheduled|sent|failed`)
+- `filters[scheduled_datetime][gte]=2025-10-01 00:00:00`
+- `filters[scheduled_datetime][lte]=2025-10-31 23:59:59`
+- `filters[created_at][gte]=2025-10-01 00:00:00`
+- `filters[created_at][lte]=2025-10-31 23:59:59`
+- `filters[has_media]=true` (boolean)
+- `filters[caption_contains]=Black Friday`
+- `filters[scheduled_today]=true` (shortcut for `DATE(scheduled_datetime) = CURDATE()`)
+- `filters[scheduled_this_week]=true` (ISO week helper)
+- `filters[message_id_state]=null` (`null` vs `not_null` – legacy alias)
 - `search=<text>` (searches `message` or `caption`)
-type": "image",
+
+**Response excerpt**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 432,
+      "type": "image",
       "message": null,
       "image_url": "https://api.evydencia.com.br/status-media/image/4a1.png",
       "video_url": null,
@@ -156,10 +171,19 @@ type": "image",
     "count": 1,
     "total": 8,
     "total_pages": 1,
-    "source": "api"
+    "source": "api",
+    "filters_applied": {
+      "type": "image",
+      "status": "pending",
+      "scheduled_datetime_gte": "2025-10-01 00:00:00",
+      "scheduled_datetime_lte": "2025-10-31 23:59:59",
+      "has_media": true
+    },
+    "available_filters": {
+      "types": ["text", "image", "video"],
+      "statuses": ["pending", "scheduled", "sent", "failed"]
+    }
   },
-  "total": 8,
-  "max_updated_at": "2025-10-07 18:15:20",
   "links": { "self": "...", "next": null, "prev": null },
   "trace_id": "..."
 }
@@ -271,9 +295,142 @@ Returns up to `limit` (default 50) ready-to-send entries.
 
 Run this via cron (`*/5 * * * * curl -X POST ...`) or a backend job queue.
 
-### 5.9 Re-upload – `POST /v1/scheduled-posts/media/upload`
+### 5.9 Re-upload - `POST /v1/scheduled-posts/media/upload`
 
 Described in Section 4; always required when a new media file is picked.
+
+### 5.10 Analytics - `GET /v1/scheduled-posts/analytics`
+
+**Use case**  
+Provide ready-to-consume KPIs (counts, success rate, upcoming workload) for dashboards without recalculating on the client.
+
+**Highlights**
+- Accepts the same filter/query parameters as the list endpoint.
+- Returns grouped metrics: `summary`, `success_rate`, `by_type`, `by_date` (last 30 buckets), `recent_activity`, `upcoming`, `performance`.
+- `meta.filters_applied` + `meta.available_filters` mirror the list endpoint.
+
+**Sample**
+```json
+{
+  "success": true,
+  "data": {
+    "summary": { "total": 150, "sent": 120, "pending": 5, "scheduled": 25, "failed": 0 },
+    "success_rate": 96.7,
+    "by_type": { "text": 50, "image": 80, "video": 20 },
+    "by_date": [
+      { "date": "2025-10-08", "sent": 15, "scheduled": 5, "failed": 0 }
+    ],
+    "recent_activity": {
+      "last_sent": "2025-10-08 17:45:00",
+      "last_created": "2025-10-08 18:00:00",
+      "sent_last_30min": 3,
+      "sent_today": 15
+    },
+    "upcoming": { "next_hour": 3, "next_24h": 12, "next_7days": 45 },
+    "performance": {
+      "avg_delivery_time_seconds": 2.5,
+      "avg_processing_time_seconds": 1.2
+    }
+  },
+  "meta": {
+    "source": "api",
+    "filters_applied": { "status": "sent" },
+    "available_filters": { "types": ["text","image","video"], "statuses": ["pending","scheduled","sent","failed"] }
+  },
+  "links": { "self": "...", "next": null, "prev": null },
+  "trace_id": "..."
+}
+```
+
+### 5.11 Bulk Delete - `DELETE /v1/scheduled-posts/bulk`
+
+**Body**
+```json
+{ "ids": [123, 124, 125] }
+```
+
+**Response**
+```json
+{
+  "success": true,
+  "data": { "deleted": 3, "failed": 0, "errors": [] },
+  "meta": { "source": "api" }
+}
+```
+
+### 5.12 Bulk Update - `PATCH /v1/scheduled-posts/bulk`
+
+**Body**
+```json
+{
+  "ids": [123, 124, 125],
+  "updates": { "scheduled_datetime": "2025-10-20 10:00:00" }
+}
+```
+
+**Notes**
+- Currently allowed fields: `scheduled_datetime`, `caption`.
+- Validation errors are returned per field (same envelope as single update).
+
+**Response**
+```json
+{
+  "success": true,
+  "data": { "updated": 3, "failed": 0, "errors": [] },
+  "meta": { "source": "api" }
+}
+```
+
+### 5.13 Bulk Dispatch - `POST /v1/scheduled-posts/bulk/dispatch`
+
+**Body**
+```json
+{ "ids": [123, 124, 125] }
+```
+
+**Response outline**
+```json
+{
+  "success": true,
+  "data": {
+    "summary": { "requested": 3, "processed": 3, "sent": 3, "failed": 0, "skipped": 0, "missing": 0 },
+    "items": [
+      { "id": 123, "status": "sent", "messageId": "3EB0...", "zaapId": "ZXCV-123" }
+    ],
+    "errors": []
+  },
+  "meta": { "source": "api", "summary": { "...": "..." } }
+}
+```
+
+### 5.14 Duplicate - `POST /v1/scheduled-posts/{id}/duplicate`
+
+**Use case**  
+Clone an existing schedule while optionally overriding fields like `scheduled_datetime`, `caption`, `message`, `type`, `image_url`, `video_url`.
+
+**Body (optional)**
+```json
+{
+  "scheduled_datetime": "2025-10-20 10:00:00",
+  "caption": "Nova legenda"
+}
+```
+
+**Response**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 456,
+    "type": "image",
+    "image_url": "...",
+    "caption": "Nova legenda",
+    "scheduled_datetime": "2025-10-20 10:00:00",
+    "original_id": 123
+  },
+  "meta": { "source": "api" }
+}
+```
 
 ---
 
