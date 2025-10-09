@@ -53,10 +53,11 @@ API REST em Slim 4 com PHP-DI que concentra as integracoes com o CRM Evydencia, 
    - `CRM_BASE_URL` e `CRM_TOKEN` (token puro).
    - Credenciais `DB_*` se utilizar os recursos locais.
 3. Opcional:
-   - `REDIS_*` habilita cache e rate limiting.
-   - `ZAPI_*` aponta para a instancia Z-API (base url, instance, token e timeout).
-   - `RATE_LIMIT_PER_MINUTE` redefine o limite padrao (60 req/min por IP+rota).
-   - Ajuste `LOG_*` para mudar path ou nivel do Monolog.
+     - `REDIS_*` habilita cache e rate limiting.
+     - `ZAPI_*` aponta para a instancia Z-API (base url, instance, token e timeout).
+     - `RATE_LIMIT_PER_MINUTE` redefine o limite padrao (60 req/min por IP+rota).
+     - `REPORT_PHOTOS_READY_STATUS_SLUGS` restringe os status considerados no relatório `orders.photos_ready` (ex.: `photos_ready,photos_delivered`).
+     - Ajuste `LOG_*` para mudar path ou nivel do Monolog.
 
 ## Execucao local
 

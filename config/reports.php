@@ -194,9 +194,52 @@ return [
             }
             $filters['include'] = implode(',', array_keys($includes));
 
+            $normalizeStatusList = static function (mixed $value): array {
+                if ($value === null || $value === false) {
+                    return [];
+                }
+
+                $items = [];
+                if (is_string($value)) {
+                    $items = explode(',', $value);
+                } elseif (is_array($value)) {
+                    $items = $value;
+                } else {
+                    return [];
+                }
+
+                $normalized = [];
+                foreach ($items as $item) {
+                    if (!is_scalar($item)) {
+                        continue;
+                    }
+
+                    $slug = strtolower(trim((string) $item));
+                    if ($slug !== '') {
+                        $normalized[$slug] = $slug;
+                    }
+                }
+
+                return array_values($normalized);
+            };
+
+            $statusSlugWhitelist = $normalizeStatusList($filters['order[status]'] ?? null);
+            if ($statusSlugWhitelist === []) {
+                $envStatusList = getenv('REPORT_PHOTOS_READY_STATUS_SLUGS');
+                $statusSlugWhitelist = $normalizeStatusList($envStatusList === false ? null : $envStatusList);
+
+                if ($statusSlugWhitelist !== []) {
+                    $filters['order[status]'] = implode(',', $statusSlugWhitelist);
+                } else {
+                    unset($filters['order[status]']);
+                }
+            } else {
+                $filters['order[status]'] = implode(',', $statusSlugWhitelist);
+            }
+
             $apiFilters = $filters;
             $apiFilters['page'] = 1;
-            $apiFilters['per_page'] = min(200, max($perPage, 50));
+            $apiFilters['per_page'] = 200;
 
             $extractQuery = static function (string $link): array {
                 $components = parse_url($link);
@@ -238,13 +281,22 @@ return [
 
                     $status = $order['status'] ?? null;
                     $statusId = 0;
+                    $statusSlug = null;
                     if (is_array($status)) {
                         $statusId = (int) ($status['id'] ?? 0);
+                        $slug = $status['slug'] ?? ($status['code'] ?? null);
+                        if (is_string($slug) && $slug !== '') {
+                            $statusSlug = strtolower($slug);
+                        }
                     } else {
                         $statusId = (int) ($order['status_id'] ?? $status ?? 0);
                     }
 
-                    if (!in_array($statusId, $statusWhitelist, true)) {
+                    $matchesSlug = $statusSlugWhitelist !== [] && $statusSlug !== null
+                        ? in_array($statusSlug, $statusSlugWhitelist, true)
+                        : false;
+
+                    if (!$matchesSlug && !in_array($statusId, $statusWhitelist, true)) {
                         continue;
                     }
 
