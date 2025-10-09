@@ -20,6 +20,16 @@ use App\Actions\Orders\UpdateOrderStatusAction;
 use App\Actions\Reports\ExportReportAction;
 use App\Actions\Reports\ListReportsAction;
 use App\Actions\Reports\RunReportAction;
+use App\Actions\Passwords\BulkPasswordsAction;
+use App\Actions\Passwords\CheckPasswordAction;
+use App\Actions\Passwords\CreatePasswordAction;
+use App\Actions\Passwords\DeletePasswordAction;
+use App\Actions\Passwords\ExportPasswordsAction;
+use App\Actions\Passwords\GetPasswordAction;
+use App\Actions\Passwords\GetPasswordPlatformsAction;
+use App\Actions\Passwords\GetPasswordStatsAction;
+use App\Actions\Passwords\ListPasswordsAction;
+use App\Actions\Passwords\UpdatePasswordAction;
 use App\Actions\ScheduledPosts\BulkDeleteScheduledPostsAction;
 use App\Actions\ScheduledPosts\BulkDispatchScheduledPostsAction;
 use App\Actions\ScheduledPosts\BulkUpdateScheduledPostsAction;
@@ -89,6 +99,19 @@ return function (App $app): void {
             $scheduled->post('/{id:[0-9]+}/mark-sent', MarkScheduledPostSentAction::class);
             $scheduled->delete('/{id:[0-9]+}', DeleteScheduledPostAction::class);
             $scheduled->post('/{id:[0-9]+}/duplicate', DuplicateScheduledPostAction::class);
+        });
+
+        $group->group('/passwords', function (RouteCollectorProxy $passwords): void {
+            $passwords->get('', ListPasswordsAction::class);
+            $passwords->post('', CreatePasswordAction::class);
+            $passwords->get('/stats', GetPasswordStatsAction::class);
+            $passwords->get('/platforms', GetPasswordPlatformsAction::class);
+            $passwords->get('/export', ExportPasswordsAction::class);
+            $passwords->post('/bulk', BulkPasswordsAction::class);
+            $passwords->get('/check', CheckPasswordAction::class);
+            $passwords->get('/{id}', GetPasswordAction::class);
+            $passwords->map(['PUT', 'PATCH'], '/{id}', UpdatePasswordAction::class);
+            $passwords->delete('/{id}', DeletePasswordAction::class);
         });
 
         $group->get('/orders/search', SearchOrdersAction::class);

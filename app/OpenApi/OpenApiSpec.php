@@ -52,6 +52,7 @@ use OpenApi\Annotations as OA;
  *     @OA\Tag(name="WhatsApp", description="WhatsApp bridge powered by Z-API"),
  *     @OA\Tag(name="Reports", description="Operational reports and exports"),
  *     @OA\Tag(name="Campaigns", description="Campaign scheduling and orchestration"),
+ *     @OA\Tag(name="Passwords", description="Gestao de senhas e credenciais empresariais"),
  *     @OA\ExternalDocumentation(
  *         description="Guides, SDKs and onboarding",
  *         url="https://docs.evydencia.com"

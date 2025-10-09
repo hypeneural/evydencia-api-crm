@@ -637,6 +637,191 @@ use OpenApi\Annotations as OA;
  *         @OA\Schema(@OA\Property(property="data", ref="#/components/schemas/GenericRecord"))
  *     }
  * )
+ *
+ * @OA\Schema(
+ *     schema="PasswordResource",
+ *     type="object",
+ *     required={"id","usuario","senha","link","tipo","local","verificado","ativo","created_at","updated_at"},
+ *     @OA\Property(property="id", type="string", format="uuid", example="550e8400-e29b-41d4-a716-446655440000"),
+ *     @OA\Property(property="usuario", type="string", example="admin@empresa.com"),
+ *     @OA\Property(property="senha", type="string", example="a1b2c3:ff0011:9933aa", description="Senha criptografada ou texto puro, dependendo do endpoint."),
+ *     @OA\Property(property="link", type="string", format="uri", example="https://exemplo.com/admin"),
+ *     @OA\Property(property="tipo", type="string", enum={"Sistema","Rede Social","E-mail"}, example="Sistema"),
+ *     @OA\Property(property="local", type="string", example="WordPress"),
+ *     @OA\Property(property="verificado", type="boolean", example=true),
+ *     @OA\Property(property="ativo", type="boolean", example=true),
+ *     @OA\Property(property="descricao", type="string", nullable=true, example="Painel administrativo"),
+ *     @OA\Property(property="ip", type="string", nullable=true, example="192.168.1.100"),
+ *     @OA\Property(property="created_at", type="string", format="date-time", example="2024-01-15T10:00:00Z"),
+ *     @OA\Property(property="updated_at", type="string", format="date-time", example="2024-01-20T14:30:00Z"),
+ *     @OA\Property(property="created_by", type="string", nullable=true, format="uuid"),
+ *     @OA\Property(property="updated_by", type="string", nullable=true, format="uuid")
+ * )
+ *
+ * @OA\Schema(
+ *     schema="PasswordCreatePayload",
+ *     type="object",
+ *     required={"usuario","senha","link","tipo","local"},
+ *     @OA\Property(property="usuario", type="string", minLength=3, maxLength=255, example="admin@empresa.com"),
+ *     @OA\Property(property="senha", type="string", minLength=6, maxLength=255, example="SenhaForte@2024"),
+ *     @OA\Property(property="link", type="string", example="https://exemplo.com/admin"),
+ *     @OA\Property(property="tipo", type="string", enum={"Sistema","Rede Social","E-mail"}, example="Sistema"),
+ *     @OA\Property(property="local", type="string", example="WordPress"),
+ *     @OA\Property(property="verificado", type="boolean", nullable=true, example=false),
+ *     @OA\Property(property="descricao", type="string", nullable=true, maxLength=500),
+ *     @OA\Property(property="ip", type="string", nullable=true, example="192.168.1.100")
+ * )
+ *
+ * @OA\Schema(
+ *     schema="PasswordUpdatePayload",
+ *     type="object",
+ *     @OA\Property(property="usuario", type="string", minLength=3, maxLength=255),
+ *     @OA\Property(property="senha", type="string", minLength=6, maxLength=255),
+ *     @OA\Property(property="link", type="string"),
+ *     @OA\Property(property="tipo", type="string", enum={"Sistema","Rede Social","E-mail"}),
+ *     @OA\Property(property="local", type="string", minLength=2, maxLength=100),
+ *     @OA\Property(property="verificado", type="boolean"),
+ *     @OA\Property(property="descricao", type="string", nullable=true, maxLength=500),
+ *     @OA\Property(property="ip", type="string", nullable=true)
+ * )
+ *
+ * @OA\Schema(
+ *     schema="PasswordBulkPayload",
+ *     type="object",
+ *     required={"action","ids"},
+ *     @OA\Property(property="action", type="string", enum={"verify","unverify","delete"}, example="verify"),
+ *     @OA\Property(property="ids", type="array", minItems=1, @OA\Items(type="string", format="uuid"))
+ * )
+ *
+ * @OA\Schema(
+ *     schema="PasswordBulkResultItem",
+ *     type="object",
+ *     required={"id","success"},
+ *     @OA\Property(property="id", type="string", format="uuid"),
+ *     @OA\Property(property="success", type="boolean"),
+ *     @OA\Property(property="error", type="string", nullable=true)
+ * )
+ *
+ * @OA\Schema(
+ *     schema="PasswordBulkResponse",
+ *     allOf={
+ *         @OA\Schema(ref="#/components/schemas/SuccessEnvelope"),
+ *         @OA\Schema(
+ *             @OA\Property(
+ *                 property="data",
+ *                 type="object",
+ *                 required={"action","affected_rows","processed","failed","results"},
+ *                 @OA\Property(property="action", type="string", example="verify"),
+ *                 @OA\Property(property="affected_rows", type="integer", example=3),
+ *                 @OA\Property(property="processed", type="integer", example=3),
+ *                 @OA\Property(property="failed", type="integer", example=0),
+ *                 @OA\Property(property="results", type="array", @OA\Items(ref="#/components/schemas/PasswordBulkResultItem"))
+ *             )
+ *         )
+ *     }
+ * )
+ *
+ * @OA\Schema(
+ *     schema="PasswordStatsResource",
+ *     type="object",
+ *     required={"total","verificados","nao_verificados","por_tipo","por_plataforma","ultimas_atualizacoes","criadas_hoje","atualizadas_hoje"},
+ *     @OA\Property(property="total", type="integer", example=150),
+ *     @OA\Property(property="verificados", type="integer", example=120),
+ *     @OA\Property(property="nao_verificados", type="integer", example=30),
+ *     @OA\Property(property="por_tipo", type="object", additionalProperties=@OA\Schema(type="integer"), example={"Sistema":60,"Rede Social":55,"E-mail":35}),
+ *     @OA\Property(property="por_plataforma", type="object", additionalProperties=@OA\Schema(type="integer")),
+ *     @OA\Property(
+ *         property="ultimas_atualizacoes",
+ *         type="array",
+ *         @OA\Items(
+ *             type="object",
+ *             required={"id","usuario","local","updated_at"},
+ *             @OA\Property(property="id", type="string", format="uuid"),
+ *             @OA\Property(property="usuario", type="string"),
+ *             @OA\Property(property="local", type="string"),
+ *             @OA\Property(property="updated_at", type="string", format="date-time")
+ *         )
+ *     ),
+ *     @OA\Property(property="criadas_hoje", type="integer", example=5),
+ *     @OA\Property(property="atualizadas_hoje", type="integer", example=12)
+ * )
+ *
+ * @OA\Schema(
+ *     schema="PasswordStatsResponse",
+ *     allOf={
+ *         @OA\Schema(ref="#/components/schemas/SuccessEnvelope"),
+ *         @OA\Schema(@OA\Property(property="data", ref="#/components/schemas/PasswordStatsResource"))
+ *     }
+ * )
+ *
+ * @OA\Schema(
+ *     schema="PasswordPlatformResource",
+ *     type="object",
+ *     required={"local","count"},
+ *     @OA\Property(property="local", type="string", example="WordPress"),
+ *     @OA\Property(property="count", type="integer", example=25)
+ * )
+ *
+ * @OA\Schema(
+ *     schema="PasswordPlatformsResponse",
+ *     allOf={
+ *         @OA\Schema(ref="#/components/schemas/SuccessEnvelope"),
+ *         @OA\Schema(
+ *             @OA\Property(
+ *                 property="data",
+ *                 type="array",
+ *                 @OA\Items(ref="#/components/schemas/PasswordPlatformResource")
+ *             )
+ *         )
+ *     }
+ * )
+ *
+ * @OA\Schema(
+ *     schema="PasswordCheckResponse",
+ *     allOf={
+ *         @OA\Schema(ref="#/components/schemas/SuccessEnvelope"),
+ *         @OA\Schema(
+ *             @OA\Property(
+ *                 property="data",
+ *                 type="object",
+ *                 required={"exists","password"},
+ *                 @OA\Property(property="exists", type="boolean"),
+ *                 @OA\Property(
+ *                     property="password",
+ *                     type="object",
+ *                     nullable=true,
+ *                     required={"id","usuario","local","verificado"},
+ *                     @OA\Property(property="id", type="string", format="uuid"),
+ *                     @OA\Property(property="usuario", type="string"),
+ *                     @OA\Property(property="local", type="string"),
+ *                     @OA\Property(property="verificado", type="boolean")
+ *                 )
+ *             )
+ *         )
+ *     }
+ * )
+ *
+ * @OA\Schema(
+ *     schema="PasswordResourceResponse",
+ *     allOf={
+ *         @OA\Schema(ref="#/components/schemas/SuccessEnvelope"),
+ *         @OA\Schema(@OA\Property(property="data", ref="#/components/schemas/PasswordResource"))
+ *     }
+ * )
+ *
+ * @OA\Schema(
+ *     schema="PasswordListResponse",
+ *     allOf={
+ *         @OA\Schema(ref="#/components/schemas/SuccessEnvelope"),
+ *         @OA\Schema(
+ *             @OA\Property(
+ *                 property="data",
+ *                 type="array",
+ *                 @OA\Items(ref="#/components/schemas/PasswordResource")
+ *             )
+ *         )
+ *     }
+ * )
  */
 final class CommonSchemas
 {

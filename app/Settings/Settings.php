@@ -104,6 +104,14 @@ final class Settings
         return $this->get('openapi', []);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    public function getSecurity(): array
+    {
+        return $this->get('security', []);
+    }
+
     public function getApiKey(): ?string
     {
         $app = $this->getApp();

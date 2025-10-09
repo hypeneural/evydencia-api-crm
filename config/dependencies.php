@@ -6,6 +6,7 @@ use App\Application\Services\BlacklistService;
 use App\Application\Services\CampaignService;
 use App\Application\Services\LabelService;
 use App\Application\Services\OrderService;
+use App\Application\Services\PasswordService;
 use App\Application\Services\ReportEngine;
 use App\Application\Services\ReportService;
 use App\Application\Services\ScheduledPostMediaService;
@@ -14,9 +15,11 @@ use App\Application\Services\WhatsAppService;
 use App\Application\Support\ApiResponder;
 use App\Application\Support\CampaignSchedulePayloadNormalizer;
 use App\Application\Support\QueryMapper;
+use App\Application\Support\PasswordCrypto;
 use App\Middleware\OpenApiValidationMiddleware;
 use App\Domain\Repositories\BlacklistRepositoryInterface;
 use App\Domain\Repositories\OrderRepositoryInterface;
+use App\Domain\Repositories\PasswordRepositoryInterface;
 use App\Domain\Repositories\ScheduledPostRepositoryInterface;
 use App\Infrastructure\Cache\RedisRateLimiter;
 use App\Infrastructure\Cache\ScheduledPostCache;
@@ -25,6 +28,7 @@ use App\Infrastructure\Http\ZapiClient;
 use App\Infrastructure\Logging\LoggerFactory;
 use App\Infrastructure\Persistence\PdoBlacklistRepository;
 use App\Infrastructure\Persistence\PdoOrderRepository;
+use App\Infrastructure\Persistence\PdoPasswordRepository;
 use App\Infrastructure\Persistence\PdoScheduledPostRepository;
 use App\Settings\Settings;
 use DI\ContainerBuilder;
@@ -87,6 +91,30 @@ return static function (ContainerBuilder $containerBuilder): void {
             return new PdoScheduledPostRepository($pdo);
         },
         ScheduledPostRepositoryInterface::class => get(PdoScheduledPostRepository::class),
+        PdoPasswordRepository::class => static function (ContainerInterface $container): PdoPasswordRepository {
+            /** @var \PDO|null $pdo */
+            $pdo = $container->get('db.connection');
+
+            return new PdoPasswordRepository($pdo);
+        },
+        PasswordRepositoryInterface::class => get(PdoPasswordRepository::class),
+        PasswordCrypto::class => static function (ContainerInterface $container): PasswordCrypto {
+            $settings = $container->get(Settings::class)->getSecurity();
+            $key = $settings['password_encryption_key'] ?? null;
+
+            if (!is_string($key) || $key === '') {
+                throw new RuntimeException('Password encryption key is not configured (security.password_encryption_key).');
+            }
+
+            return new PasswordCrypto($key);
+        },
+        PasswordService::class => static function (ContainerInterface $container): PasswordService {
+            return new PasswordService(
+                $container->get(PasswordRepositoryInterface::class),
+                $container->get(PasswordCrypto::class),
+                $container->get(LoggerInterface::class)
+            );
+        },
         'redis.client' => static function (ContainerInterface $container): ?PredisClient {
             $redis = $container->get(Settings::class)->getRedis();
 

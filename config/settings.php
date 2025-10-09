@@ -134,4 +134,7 @@ return [
             FILTER_VALIDATE_BOOL
         ),
     ],
+    'security' => [
+        'password_encryption_key' => $_ENV['PASSWORD_ENCRYPTION_KEY'] ?? '',
+    ],
 ];

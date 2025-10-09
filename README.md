@@ -16,6 +16,7 @@ API REST em Slim 4 com PHP-DI que concentra as integracoes com o CRM Evydencia, 
   - [Autenticacao e rate limit](#autenticacao-e-rate-limit)
   - [Blacklist (recurso local)](#blacklist-recurso-local)
   - [Agendamentos de postagens](#agendamentos-de-postagens)
+  - [Gestao de senhas](#gestao-de-senhas)
   - [Pedidos (CRM)](#pedidos-crm)
   - [Relatorios (CRM)](#relatorios-crm)
   - [Campanhas (CRM)](#campanhas-crm)
@@ -50,6 +51,7 @@ API REST em Slim 4 com PHP-DI que concentra as integracoes com o CRM Evydencia, 
 1. Copie `.env.example` para `.env`.
 2. Ajuste as variaveis obrigatorias:
    - `APP_ENV`, `APP_DEBUG`, `APP_API_KEY`.
+   - `PASSWORD_ENCRYPTION_KEY` (64 caracteres hexadecimais para criptografia AES-256-GCM).
    - `CRM_BASE_URL` e `CRM_TOKEN` (token puro).
    - Credenciais `DB_*` se utilizar os recursos locais.
 3. Opcional:
@@ -202,6 +204,21 @@ Execute o script em `database/migrations` ou utilize um client MySQL de sua pref
 | POST   | /v1/scheduled-posts/{id}/mark-sent | Marca como enviado e persiste `messageId`/`zaapId`. | Atualiza timestamps e invalida cache. |
 | DELETE | /v1/scheduled-posts/{id} | Remove agendamento. | Retorna 204. |
 | GET    | /v1/scheduled-posts/ready | Lista itens prontos para envio. | Query `limit` (default 50) + cabecalho `X-Total-Count`. |
+
+### Gestao de senhas
+
+| Metodo | Rota | Descricao | Notas |
+|--------|------|-----------|-------|
+| GET    | /v1/passwords | Lista senhas com filtros (`q`, `filter[tipo]`, `filter[verificado]`, paginacao). | Suporta `fetch=all`, `sort`, `fields[passwords]`. |
+| GET    | /v1/passwords/{id} | Retorna detalhes com senha em texto claro. | `id` UUID obrigatorio. |
+| POST   | /v1/passwords | Cria nova credencial criptografada. | Body com `usuario`, `senha`, `link`, `tipo`, `local`, opcionais `descricao`, `ip`, `verificado`. |
+| PATCH  | /v1/passwords/{id} | Atualiza campos da senha. | Corpo parcial; recriptografa `senha` quando enviada. |
+| DELETE | /v1/passwords/{id} | Soft delete da credencial. | Mantem log em `password_logs`. |
+| POST   | /v1/passwords/bulk | Executa `verify`, `unverify` ou `delete` em lote. | Body `{ action, ids[] }`. |
+| GET    | /v1/passwords/stats | Estatisticas agregadas (totais, tipos, plataformas, ultimas atualizacoes). | Ideal para dashboards. |
+| GET    | /v1/passwords/platforms | Plataformas mais recorrentes. | Query `limit` (padrao 20) e `min_count`. |
+| GET    | /v1/passwords/export | Exporta dados em `json`, `csv` ou `xlsx`. | Reaproveita filtros da listagem. |
+| GET    | /v1/passwords/check | Verifica existencia por `local` + `usuario`. | Retorna indicador `exists` e dados resumidos. |
 
 ### Pedidos (CRM)
 

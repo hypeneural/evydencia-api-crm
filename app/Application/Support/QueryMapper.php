@@ -119,6 +119,20 @@ final class QueryMapper
         ],
     ];
 
+    /**
+     * @var array<string, array<string, string>>
+     */
+    private const PASSWORD_RANGE_FILTERS = [
+        'created_at' => [
+            'gte' => 'created_at_gte',
+            'lte' => 'created_at_lte',
+        ],
+        'updated_at' => [
+            'gte' => 'updated_at_gte',
+            'lte' => 'updated_at_lte',
+        ],
+    ];
+
 
     /**
      * @var array<string, string>
@@ -319,6 +333,34 @@ final class QueryMapper
         $inlineFilters = $this->extractScheduledPostsInlineFilters($queryParams);
         if ($inlineFilters !== []) {
             $mappedFilters = array_merge($mappedFilters, $this->mapScheduledPostsFilters($inlineFilters));
+        }
+
+        $crmQuery = [
+            'filters' => $mappedFilters,
+        ];
+
+        $search = $this->sanitizeScalar($queryParams['q'] ?? null);
+        if ($search !== '') {
+            $crmQuery['search'] = $search;
+        }
+
+        $sort = $this->parseSort($queryParams['sort'] ?? null);
+        $fields = $this->parseFields($queryParams['fields'] ?? []);
+
+        return new QueryOptions($crmQuery, $page, $perPage, $fetchAll, $sort, $fields);
+    }
+
+    public function mapPasswords(array $queryParams): QueryOptions
+    {
+        [$page, $perPage] = $this->resolvePagination($queryParams);
+        $fetchAll = $this->normalizeFetch($queryParams['fetch'] ?? ($queryParams['all'] ?? null));
+
+        $filters = $this->normalizeArray($queryParams['filter'] ?? []);
+        $mappedFilters = $this->mapPasswordFilters($filters);
+
+        $inlineFilters = $this->extractPasswordInlineFilters($queryParams);
+        if ($inlineFilters !== []) {
+            $mappedFilters = array_merge($mappedFilters, $this->mapPasswordFilters($inlineFilters));
         }
 
         $crmQuery = [
@@ -647,6 +689,116 @@ final class QueryMapper
             '!null', 'not_null' => 'not_null',
             default => null,
         };
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<string, mixed>
+     */
+    private function mapPasswordFilters(array $filters): array
+    {
+        $mapped = [];
+
+        if (isset($filters['tipo'])) {
+            $tipo = $this->sanitizeScalar($filters['tipo']);
+            if ($tipo !== '') {
+                $mapped['tipo'] = $tipo;
+            }
+        }
+
+        if (isset($filters['local'])) {
+            $local = $this->sanitizeScalar($filters['local']);
+            if ($local !== '') {
+                $mapped['local'] = $local;
+            }
+        }
+
+        if (array_key_exists('verificado', $filters)) {
+            $flag = $this->normalizeBoolean($filters['verificado']);
+            if ($flag !== null) {
+                $mapped['verificado'] = $flag;
+            }
+        }
+
+        if (array_key_exists('ativo', $filters)) {
+            $flag = $this->normalizeBoolean($filters['ativo']);
+            if ($flag !== null) {
+                $mapped['ativo'] = $flag;
+            }
+        }
+
+        if (array_key_exists('include_inactive', $filters)) {
+            $flag = $this->normalizeBoolean($filters['include_inactive']);
+            if ($flag !== null) {
+                $mapped['include_inactive'] = $flag;
+            }
+        }
+
+        foreach (self::PASSWORD_RANGE_FILTERS as $source => $operators) {
+            if (isset($filters[$source]) && is_array($filters[$source])) {
+                foreach ($operators as $operator => $target) {
+                    $value = $this->sanitizeScalar($filters[$source][$operator] ?? null);
+                    if ($value !== '') {
+                        $mapped[$target] = $value;
+                    }
+                }
+            }
+
+            foreach ($operators as $operator => $target) {
+                $direct = sprintf('%s_%s', $source, $operator);
+                if (!array_key_exists($direct, $filters)) {
+                    continue;
+                }
+
+                $value = $this->sanitizeScalar($filters[$direct]);
+                if ($value !== '') {
+                    $mapped[$target] = $value;
+                }
+            }
+        }
+
+        return $mapped;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function extractPasswordInlineFilters(array $params): array
+    {
+        $inline = [];
+
+        foreach (['tipo', 'local'] as $scalar) {
+            if (array_key_exists($scalar, $params) && !is_array($params[$scalar])) {
+                $inline[$scalar] = $params[$scalar];
+            }
+        }
+
+        foreach (['verificado', 'ativo', 'include_inactive'] as $booleanKey) {
+            if (array_key_exists($booleanKey, $params) && !is_array($params[$booleanKey])) {
+                $inline[$booleanKey] = $params[$booleanKey];
+            }
+        }
+
+        foreach (self::PASSWORD_RANGE_FILTERS as $field => $operators) {
+            if (isset($params[$field]) && is_array($params[$field])) {
+                $inline[$field] = $params[$field];
+            }
+
+            foreach (array_keys($operators) as $operator) {
+                $key = sprintf('%s_%s', $field, $operator);
+                if (!array_key_exists($key, $params)) {
+                    continue;
+                }
+
+                if (!isset($inline[$field]) || !is_array($inline[$field])) {
+                    $inline[$field] = [];
+                }
+
+                $inline[$field][$operator] = $params[$key];
+            }
+        }
+
+        return $inline;
     }
 
     private function mapBlacklistFilters(array $filters): array
