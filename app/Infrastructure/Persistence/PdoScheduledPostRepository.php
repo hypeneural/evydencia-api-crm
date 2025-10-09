@@ -270,7 +270,7 @@ final class PdoScheduledPostRepository implements ScheduledPostRepositoryInterfa
                 SUM(CASE WHEN %2$s AND scheduled_datetime <= NOW() AND scheduled_datetime >= DATE_SUB(NOW(), INTERVAL %3$d MINUTE) THEN 1 ELSE 0 END) AS pending,
                 SUM(CASE WHEN %2$s AND scheduled_datetime > NOW() THEN 1 ELSE 0 END) AS scheduled,
                 SUM(CASE WHEN %2$s AND scheduled_datetime < DATE_SUB(NOW(), INTERVAL %3$d MINUTE) THEN 1 ELSE 0 END) AS failed
-             FROM scheduled_posts%s',
+             FROM scheduled_posts%4$s',
             self::MESSAGE_SENT_CONDITION,
             self::MESSAGE_NOT_SENT_CONDITION,
             self::FAILED_GRACE_MINUTES,
@@ -317,7 +317,7 @@ final class PdoScheduledPostRepository implements ScheduledPostRepositoryInterfa
                 SUM(CASE WHEN %1$s THEN 1 ELSE 0 END) AS sent,
                 SUM(CASE WHEN %2$s AND scheduled_datetime > NOW() THEN 1 ELSE 0 END) AS scheduled,
                 SUM(CASE WHEN %2$s AND scheduled_datetime < DATE_SUB(NOW(), INTERVAL %3$d MINUTE) THEN 1 ELSE 0 END) AS failed
-             FROM scheduled_posts%s
+             FROM scheduled_posts%4$s
              GROUP BY bucket_date
              ORDER BY bucket_date DESC
              LIMIT 30',
@@ -346,7 +346,7 @@ final class PdoScheduledPostRepository implements ScheduledPostRepositoryInterfa
                 MAX(created_at) AS last_created,
                 SUM(CASE WHEN %1$s AND updated_at >= DATE_SUB(NOW(), INTERVAL 30 MINUTE) THEN 1 ELSE 0 END) AS sent_last_30min,
                 SUM(CASE WHEN %1$s AND DATE(updated_at) = CURRENT_DATE THEN 1 ELSE 0 END) AS sent_today
-             FROM scheduled_posts%s',
+             FROM scheduled_posts%2$s',
             self::MESSAGE_SENT_CONDITION,
             $where
         );
@@ -360,7 +360,7 @@ final class PdoScheduledPostRepository implements ScheduledPostRepositoryInterfa
                 SUM(CASE WHEN %1$s AND scheduled_datetime > NOW() AND scheduled_datetime <= DATE_ADD(NOW(), INTERVAL 1 HOUR) THEN 1 ELSE 0 END) AS next_hour,
                 SUM(CASE WHEN %1$s AND scheduled_datetime > NOW() AND scheduled_datetime <= DATE_ADD(NOW(), INTERVAL 24 HOUR) THEN 1 ELSE 0 END) AS next_24h,
                 SUM(CASE WHEN %1$s AND scheduled_datetime > NOW() AND scheduled_datetime <= DATE_ADD(NOW(), INTERVAL 7 DAY) THEN 1 ELSE 0 END) AS next_7days
-             FROM scheduled_posts%s',
+             FROM scheduled_posts%2$s',
             self::MESSAGE_NOT_SENT_CONDITION,
             $where
         );
@@ -373,7 +373,7 @@ final class PdoScheduledPostRepository implements ScheduledPostRepositoryInterfa
             'SELECT
                 AVG(CASE WHEN %1$s THEN GREATEST(TIMESTAMPDIFF(SECOND, scheduled_datetime, updated_at), 0) END) AS avg_delivery,
                 AVG(CASE WHEN %1$s THEN GREATEST(TIMESTAMPDIFF(SECOND, created_at, updated_at), 0) END) AS avg_processing
-             FROM scheduled_posts%s',
+             FROM scheduled_posts%2$s',
             self::MESSAGE_SENT_CONDITION,
             $where
         );
@@ -601,4 +601,3 @@ final class PdoScheduledPostRepository implements ScheduledPostRepositoryInterfa
         return $this->connection;
     }
 }
-
