@@ -259,7 +259,7 @@ final class ListScheduledPostsAction
 
      */
 
-    private function buildSignature(QueryOptions $options): array
+    private function buildSignature(\App\Application\DTO\QueryOptions $options): array
 
     {
 

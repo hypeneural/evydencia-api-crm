@@ -84,11 +84,11 @@ return function (App $app): void {
             $scheduled->delete('/bulk', BulkDeleteScheduledPostsAction::class);
             $scheduled->patch('/bulk', BulkUpdateScheduledPostsAction::class);
             $scheduled->post('/bulk/dispatch', BulkDispatchScheduledPostsAction::class);
-            $scheduled->get('/{id}', GetScheduledPostAction::class);
-            $scheduled->map(['PUT', 'PATCH'], '/{id}', UpdateScheduledPostAction::class);
-            $scheduled->post('/{id}/mark-sent', MarkScheduledPostSentAction::class);
-            $scheduled->delete('/{id}', DeleteScheduledPostAction::class);
-            $scheduled->post('/{id}/duplicate', DuplicateScheduledPostAction::class);
+            $scheduled->get('/{id:[0-9]+}', GetScheduledPostAction::class);
+            $scheduled->map(['PUT', 'PATCH'], '/{id:[0-9]+}', UpdateScheduledPostAction::class);
+            $scheduled->post('/{id:[0-9]+}/mark-sent', MarkScheduledPostSentAction::class);
+            $scheduled->delete('/{id:[0-9]+}', DeleteScheduledPostAction::class);
+            $scheduled->post('/{id:[0-9]+}/duplicate', DuplicateScheduledPostAction::class);
         });
 
         $group->get('/orders/search', SearchOrdersAction::class);
