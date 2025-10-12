@@ -195,6 +195,11 @@ return [
             $filters['include'] = implode(',', array_keys($includes));
 
             $normalizeStatusList = static function (mixed $value): array {
+                $aliases = [
+                    'photos_ready' => 'waiting_product_retrieve',
+                    'photos_delivered' => 'product_retrieve_confirmed',
+                ];
+
                 if ($value === null || $value === false) {
                     return [];
                 }
@@ -215,9 +220,12 @@ return [
                     }
 
                     $slug = strtolower(trim((string) $item));
-                    if ($slug !== '') {
-                        $normalized[$slug] = $slug;
+                    if ($slug === '') {
+                        continue;
                     }
+
+                    $mapped = $aliases[$slug] ?? $slug;
+                    $normalized[$mapped] = $mapped;
                 }
 
                 return array_values($normalized);
@@ -229,19 +237,22 @@ return [
                 $statusSlugWhitelist = $normalizeStatusList($envStatusList === false ? null : $envStatusList);
             }
 
-            if ($statusSlugWhitelist === []) {
-                $statusSlugWhitelist = ['photos_ready', 'photos_delivered'];
+            $statusSlugWhitelist = array_values(array_unique($statusSlugWhitelist));
+            unset($filters['order[status]']);
+
+            $defaultStatuses = ['waiting_product_retrieve', 'product_retrieve_confirmed'];
+            $statusesToQuery = array_values(array_filter(
+                $statusSlugWhitelist,
+                static fn (string $status): bool => !ctype_digit($status)
+            ));
+
+            if ($statusesToQuery === []) {
+                $statusesToQuery = $defaultStatuses;
             }
 
-            if ($statusSlugWhitelist !== []) {
-                $filters['order[status]'] = implode(',', array_values(array_unique($statusSlugWhitelist)));
-            } else {
-                unset($filters['order[status]']);
-            }
+            $allowedStatusSlugs = $statusSlugWhitelist !== [] ? $statusesToQuery : $defaultStatuses;
 
-            $apiFilters = $filters;
-            $apiFilters['page'] = 1;
-            $apiFilters['per_page'] = 200;
+            $baseApiFilters = $filters;
 
             $extractQuery = static function (string $link): array {
                 $components = parse_url($link);
@@ -253,7 +264,7 @@ return [
                 return is_array($query) ? $query : [];
             };
 
-            $statusWhitelist = [6, 9];
+            $statusIdWhitelist = [6, 9, 10, 12];
             $orders = [];
             $meta = [
                 'page' => $page,
@@ -265,60 +276,76 @@ return [
             ];
 
             $maxIterations = 30;
-            $iteration = 0;
+            foreach ($statusesToQuery as $statusToQuery) {
+                $apiFilters = $baseApiFilters;
+                $apiFilters['order[status]'] = $statusToQuery;
+                $apiFilters['page'] = 1;
+                $apiFilters['per_page'] = 200;
 
-            do {
-                $response = $api->searchOrders($apiFilters, $traceId);
-                $body = $response['body'] ?? [];
-                $batch = isset($body['data']) && is_array($body['data']) ? $body['data'] : [];
+                $iteration = 0;
 
-                if ($batch === []) {
-                    break;
-                }
+                do {
+                    $response = $api->searchOrders($apiFilters, $traceId);
+                    $body = $response['body'] ?? [];
+                    $batch = isset($body['data']) && is_array($body['data']) ? $body['data'] : [];
 
-                foreach ($batch as $order) {
-                    if (!is_array($order)) {
-                        continue;
+                    if ($batch === []) {
+                        break;
                     }
 
-                    $status = $order['status'] ?? null;
-                    $statusId = 0;
-                    $statusSlug = null;
-                    if (is_array($status)) {
-                        $statusId = (int) ($status['id'] ?? 0);
-                        $slug = $status['slug'] ?? ($status['code'] ?? null);
-                        if (is_string($slug) && $slug !== '') {
-                            $statusSlug = strtolower($slug);
+                    foreach ($batch as $order) {
+                        if (!is_array($order)) {
+                            continue;
                         }
-                    } else {
-                        $statusId = (int) ($order['status_id'] ?? $status ?? 0);
+
+                        $status = $order['status'] ?? null;
+                        $statusId = 0;
+                        $statusSlug = null;
+                        if (is_array($status)) {
+                            $statusId = (int) ($status['id'] ?? 0);
+                            $slug = $status['slug'] ?? ($status['code'] ?? null);
+                            if (is_string($slug) && $slug !== '') {
+                                $statusSlug = strtolower($slug);
+                            }
+                        } else {
+                            $statusId = (int) ($order['status_id'] ?? $status ?? 0);
+                        }
+
+                        $matchesSlug = $statusSlug !== null && in_array($statusSlug, $allowedStatusSlugs, true);
+
+                        if (!$matchesSlug && !in_array($statusId, $statusIdWhitelist, true)) {
+                            continue;
+                        }
+
+                        $orderKey = null;
+                        if (isset($order['uuid']) && is_string($order['uuid']) && $order['uuid'] !== '') {
+                            $orderKey = 'uuid:' . strtolower($order['uuid']);
+                        } elseif (isset($order['id'])) {
+                            $orderKey = 'id:' . (string) $order['id'];
+                        }
+
+                        if ($orderKey === null) {
+                            $orders[] = $order;
+                        } else {
+                            $orders[$orderKey] = $order;
+                        }
                     }
 
-                    $matchesSlug = $statusSlugWhitelist !== [] && $statusSlug !== null
-                        ? in_array($statusSlug, $statusSlugWhitelist, true)
-                        : false;
+                    $links = $body['links'] ?? [];
+                    $next = is_array($links) ? ($links['next'] ?? null) : null;
 
-                    if (!$matchesSlug && !in_array($statusId, $statusWhitelist, true)) {
-                        continue;
+                    if (!is_string($next) || $next === '') {
+                        break;
                     }
 
-                    $orders[] = $order;
-                }
+                    $nextQuery = $extractQuery($next);
+                    if ($nextQuery === []) {
+                        break;
+                    }
 
-                $links = $body['links'] ?? [];
-                $next = is_array($links) ? ($links['next'] ?? null) : null;
-
-                if (!is_string($next) || $next === '') {
-                    break;
-                }
-
-                $nextQuery = $extractQuery($next);
-                if ($nextQuery === []) {
-                    break;
-                }
-
-                $apiFilters = array_merge($apiFilters, $nextQuery);
-            } while (++$iteration < $maxIterations);
+                    $apiFilters = array_merge($apiFilters, $nextQuery);
+                } while (++$iteration < $maxIterations);
+            }
 
             $formatSchedule = static function (?string $value): array {
                 if (!is_string($value) || trim($value) === '') {
@@ -435,6 +462,8 @@ return [
                 return '';
             };
 
+            $ordersList = array_values($orders);
+
             $rows = array_map(static function (array $order) use ($formatSchedule, $normalizePhone, $formatPhone, $extractFirstName, $collectProducts): array {
                 $scheduleRaw = $order['schedule_1'] ?? ($order['schedule_one'] ?? null);
                 $schedule = $formatSchedule(is_string($scheduleRaw) ? $scheduleRaw : null);
@@ -466,7 +495,7 @@ return [
                     'status_name' => $statusName,
                     'link' => $uuid === null ? null : sprintf('https://evydencia.com/gestao/pedidos/%s/detalhes', $uuid),
                 ];
-            }, $orders);
+            }, $ordersList);
 
             $sortKey = match ($sortField) {
                 'customer_name' => 'customer_name',

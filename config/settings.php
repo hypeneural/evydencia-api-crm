@@ -116,6 +116,7 @@ return [
         'allowed_headers' => array_filter(array_map('trim', explode(',', $_ENV['CORS_ALLOWED_HEADERS'] ?? '*'))),
         'exposed_headers' => array_filter(array_map('trim', explode(',', $_ENV['CORS_EXPOSED_HEADERS'] ?? 'Link,X-RateLimit-Limit,X-RateLimit-Remaining,X-RateLimit-Reset,Trace-Id'))),
         'allow_credentials' => filter_var($_ENV['CORS_ALLOW_CREDENTIALS'] ?? false, FILTER_VALIDATE_BOOL),
+        'allow_all_headers' => filter_var($_ENV['CORS_ALLOW_ALL_HEADERS'] ?? 'true', FILTER_VALIDATE_BOOL),
         'max_age' => (int) ($_ENV['CORS_MAX_AGE'] ?? 86400),
         'allow_localhost' => filter_var(
             $_ENV['CORS_ALLOW_LOCALHOST'] ?? ($appEnv !== 'production' ? 'true' : 'false'),

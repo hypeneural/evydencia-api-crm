@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Application\Support\ApiResponder;
 use App\Middleware\ApiKeyMiddleware;
+use App\Middleware\CorsMiddleware;
 use App\Middleware\RateLimitMiddleware;
 use App\Middleware\RequestLoggingMiddleware;
 use App\Middleware\OpenApiValidationMiddleware;
@@ -15,7 +16,6 @@ use Psr\Log\LoggerInterface;
 use Slim\App;
 use Slim\Exception\HttpException;
 use Slim\Psr7\Response;
-use Tuupola\Middleware\CorsMiddleware;
 
 return function (App $app): void {
     $container = $app->getContainer();
@@ -43,9 +43,21 @@ return function (App $app): void {
     if ($allowedOrigins === []) {
         $allowedOrigins = ['*'];
     }
+    $allowedOrigins = array_values(array_filter(array_map(
+        static fn ($origin) => is_string($origin) ? trim($origin) : null,
+        $allowedOrigins
+    )));
+
+    $allowAllOrigins = in_array('*', $allowedOrigins, true);
+    if ($allowAllOrigins) {
+        $allowedOrigins = array_values(array_filter(
+            $allowedOrigins,
+            static fn (string $origin): bool => $origin !== '*'
+        ));
+    }
 
     $allowLocalhost = (bool) ($corsSettings['allow_localhost'] ?? false);
-    $hasWildcardOrigin = in_array('*', $allowedOrigins, true);
+    $hasWildcardOrigin = $allowAllOrigins;
 
     if ($allowLocalhost && !$hasWildcardOrigin) {
         $localhostOrigins = [
@@ -72,27 +84,51 @@ return function (App $app): void {
     }
 
     $allowedMethods = $corsSettings['allowed_methods'] ?? ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'];
+    $allowedMethods = array_values(array_filter(array_map(
+        static fn ($method) => is_string($method) ? strtoupper(trim($method)) : null,
+        $allowedMethods
+    )));
+    $allowAllMethods = in_array('*', $allowedMethods, true);
+    if ($allowAllMethods) {
+        $allowedMethods = array_values(array_filter(
+            $allowedMethods,
+            static fn (string $method): bool => $method !== '*'
+        ));
+    }
     if ($allowedMethods === []) {
         $allowedMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'];
     }
 
     $allowedHeaders = $corsSettings['allowed_headers'] ?? ['*'];
-    if ($allowedHeaders === [] || in_array('*', $allowedHeaders, true)) {
-        $allowedHeaders = ['*'];
+    $allowedHeaders = array_values(array_filter(array_map(
+        static fn ($header) => is_string($header) ? trim($header) : null,
+        $allowedHeaders
+    )));
+    $allowAllHeaders = (bool) ($corsSettings['allow_all_headers'] ?? true);
+    if (in_array('*', $allowedHeaders, true)) {
+        $allowAllHeaders = true;
+        $allowedHeaders = array_values(array_filter(
+            $allowedHeaders,
+            static fn (string $header): bool => $header !== '*'
+        ));
     }
 
     $exposedHeaders = $corsSettings['exposed_headers'] ?? ['Link', 'Trace-Id'];
-    if ($exposedHeaders === [] && isset($corsSettings['exposed_headers'])) {
-        $exposedHeaders = [];
-    }
+    $exposedHeaders = array_values(array_filter(array_map(
+        static fn ($header) => is_string($header) ? trim($header) : null,
+        $exposedHeaders
+    )));
 
     $corsOptions = [
-        'origin' => $allowedOrigins,
-        'methods' => $allowedMethods,
-        'headers.allow' => $allowedHeaders,
-        'headers.expose' => $exposedHeaders,
-        'credentials' => (bool) ($corsSettings['allow_credentials'] ?? false),
-        'cache' => $corsSettings['max_age'] ?? 86400,
+        'allow_all_origins' => $allowAllOrigins,
+        'allowed_origins' => $allowedOrigins,
+        'allow_all_methods' => $allowAllMethods,
+        'allowed_methods' => $allowedMethods,
+        'allow_all_headers' => $allowAllHeaders,
+        'allowed_headers' => $allowedHeaders,
+        'exposed_headers' => $exposedHeaders,
+        'allow_credentials' => (bool) ($corsSettings['allow_credentials'] ?? false),
+        'max_age' => (int) ($corsSettings['max_age'] ?? 86400),
     ];
 
     $app->addRoutingMiddleware();
