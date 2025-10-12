@@ -112,8 +112,8 @@ return [
     ],
     'cors' => [
         'allowed_origins' => array_filter(array_map('trim', explode(',', $_ENV['CORS_ALLOWED_ORIGINS'] ?? '*'))),
-        'allowed_methods' => array_filter(array_map('trim', explode(',', $_ENV['CORS_ALLOWED_METHODS'] ?? 'GET,POST,PUT,PATCH,DELETE,OPTIONS'))),
-        'allowed_headers' => array_filter(array_map('trim', explode(',', $_ENV['CORS_ALLOWED_HEADERS'] ?? 'Content-Type,Accept,Authorization,X-Requested-With,X-API-Key'))),
+        'allowed_methods' => array_filter(array_map('trim', explode(',', $_ENV['CORS_ALLOWED_METHODS'] ?? 'GET,POST,PUT,PATCH,DELETE,OPTIONS,HEAD'))),
+        'allowed_headers' => array_filter(array_map('trim', explode(',', $_ENV['CORS_ALLOWED_HEADERS'] ?? '*'))),
         'exposed_headers' => array_filter(array_map('trim', explode(',', $_ENV['CORS_EXPOSED_HEADERS'] ?? 'Link,X-RateLimit-Limit,X-RateLimit-Remaining,X-RateLimit-Reset,Trace-Id'))),
         'allow_credentials' => filter_var($_ENV['CORS_ALLOW_CREDENTIALS'] ?? false, FILTER_VALIDATE_BOOL),
         'max_age' => (int) ($_ENV['CORS_MAX_AGE'] ?? 86400),

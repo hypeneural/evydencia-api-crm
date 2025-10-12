@@ -30,6 +30,12 @@ final class ApiKeyMiddleware implements MiddlewareInterface
             $request = $request->withAttribute('trace_id', $traceId);
         }
 
+        $method = strtoupper($request->getMethod());
+        if ($method === 'OPTIONS') {
+            // Skip API key validation for CORS preflight requests.
+            return $handler->handle($request);
+        }
+
         $expected = $this->settings->getApiKey();
         if ($expected === null || $expected === '') {
             return $handler->handle($request);

@@ -71,11 +71,26 @@ return function (App $app): void {
         $allowedOrigins = array_values(array_unique(array_merge($allowedOrigins, $localhostOrigins)));
     }
 
+    $allowedMethods = $corsSettings['allowed_methods'] ?? ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'];
+    if ($allowedMethods === []) {
+        $allowedMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'];
+    }
+
+    $allowedHeaders = $corsSettings['allowed_headers'] ?? ['*'];
+    if ($allowedHeaders === [] || in_array('*', $allowedHeaders, true)) {
+        $allowedHeaders = ['*'];
+    }
+
+    $exposedHeaders = $corsSettings['exposed_headers'] ?? ['Link', 'Trace-Id'];
+    if ($exposedHeaders === [] && isset($corsSettings['exposed_headers'])) {
+        $exposedHeaders = [];
+    }
+
     $corsOptions = [
         'origin' => $allowedOrigins,
-        'methods' => $corsSettings['allowed_methods'] ?? ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-        'headers.allow' => $corsSettings['allowed_headers'] ?? ['Content-Type', 'Accept', 'Authorization', 'X-Requested-With', 'X-API-Key'],
-        'headers.expose' => $corsSettings['exposed_headers'] ?? ['Link', 'Trace-Id'],
+        'methods' => $allowedMethods,
+        'headers.allow' => $allowedHeaders,
+        'headers.expose' => $exposedHeaders,
         'credentials' => (bool) ($corsSettings['allow_credentials'] ?? false),
         'cache' => $corsSettings['max_age'] ?? 86400,
     ];

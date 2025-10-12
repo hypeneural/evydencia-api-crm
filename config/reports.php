@@ -227,14 +227,16 @@ return [
             if ($statusSlugWhitelist === []) {
                 $envStatusList = getenv('REPORT_PHOTOS_READY_STATUS_SLUGS');
                 $statusSlugWhitelist = $normalizeStatusList($envStatusList === false ? null : $envStatusList);
+            }
 
-                if ($statusSlugWhitelist !== []) {
-                    $filters['order[status]'] = implode(',', $statusSlugWhitelist);
-                } else {
-                    unset($filters['order[status]']);
-                }
+            if ($statusSlugWhitelist === []) {
+                $statusSlugWhitelist = ['photos_ready', 'photos_delivered'];
+            }
+
+            if ($statusSlugWhitelist !== []) {
+                $filters['order[status]'] = implode(',', array_values(array_unique($statusSlugWhitelist)));
             } else {
-                $filters['order[status]'] = implode(',', $statusSlugWhitelist);
+                unset($filters['order[status]']);
             }
 
             $apiFilters = $filters;
