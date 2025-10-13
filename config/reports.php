@@ -121,7 +121,7 @@ return [
         'type' => 'closure',
         'title' => 'Clientes com fotos prontas para retirada',
         'description' => 'Lista pedidos com sessoes ja realizadas e com status que indicam fotos disponiveis para retirada.',
-        'cache' => 600,
+        'cache' => 300,
         'rules' => [
             'product[slug]' => v::optional(v::stringType()->length(1, 64)),
             'order[session-start]' => v::optional(v::date('Y-m-d')),
@@ -129,7 +129,8 @@ return [
         ],
         'defaults' => [
             'product[slug]' => 'natal',
-            'order[session-end]' => (new DateTimeImmutable('today'))->format('Y-m-d'),
+            'order[session-start]' => (new DateTimeImmutable('-30 days'))->format('Y-m-d'),
+            'order[session-end]' => (new DateTimeImmutable('-1 day'))->format('Y-m-d'),
             'include' => 'items,customer,status',
         ],
         'columns' => [
@@ -166,18 +167,14 @@ return [
                 $filters[$key] = $value;
             }
 
-            if (isset($filters['item[slug]']) && !isset($filters['product[slug]'])) {
-                $filters['product[slug]'] = $filters['item[slug]'];
-            }
             unset($filters['item[slug]']);
 
-            if (!isset($filters['product[slug]']) || trim((string) $filters['product[slug]']) === '') {
-                $filters['product[slug]'] = 'natal';
-            }
+            $today = new DateTimeImmutable('today');
 
-            if (!isset($filters['order[session-end]']) || trim((string) $filters['order[session-end]']) === '') {
-                $filters['order[session-end]'] = (new DateTimeImmutable('today'))->format('Y-m-d');
-            }
+            $filters['product[slug]'] = 'natal';
+            $filters['order[session-start]'] = $today->sub(new DateInterval('P30D'))->format('Y-m-d');
+            $filters['order[session-end]'] = $today->sub(new DateInterval('P1D'))->format('Y-m-d');
+            unset($filters['order[status]']);
 
             $includes = [];
             if (isset($filters['include'])) {
@@ -194,65 +191,20 @@ return [
             }
             $filters['include'] = implode(',', array_keys($includes));
 
-            $normalizeStatusList = static function (mixed $value): array {
-                $aliases = [
-                    'photos_ready' => 'waiting_product_retrieve',
-                    'photos_delivered' => 'product_retrieve_confirmed',
-                ];
-
-                if ($value === null || $value === false) {
-                    return [];
-                }
-
-                $items = [];
-                if (is_string($value)) {
-                    $items = explode(',', $value);
-                } elseif (is_array($value)) {
-                    $items = $value;
-                } else {
-                    return [];
-                }
-
-                $normalized = [];
-                foreach ($items as $item) {
-                    if (!is_scalar($item)) {
-                        continue;
-                    }
-
-                    $slug = strtolower(trim((string) $item));
-                    if ($slug === '') {
-                        continue;
-                    }
-
-                    $mapped = $aliases[$slug] ?? $slug;
-                    $normalized[$mapped] = $mapped;
-                }
-
-                return array_values($normalized);
-            };
-
-            $statusSlugWhitelist = $normalizeStatusList($filters['order[status]'] ?? null);
-            if ($statusSlugWhitelist === []) {
-                $envStatusList = getenv('REPORT_PHOTOS_READY_STATUS_SLUGS');
-                $statusSlugWhitelist = $normalizeStatusList($envStatusList === false ? null : $envStatusList);
-            }
-
-            $statusSlugWhitelist = array_values(array_unique($statusSlugWhitelist));
-            unset($filters['order[status]']);
-
-            $defaultStatuses = ['waiting_product_retrieve', 'product_retrieve_confirmed'];
-            $statusesToQuery = array_values(array_filter(
-                $statusSlugWhitelist,
-                static fn (string $status): bool => !ctype_digit($status)
-            ));
-
-            if ($statusesToQuery === []) {
-                $statusesToQuery = $defaultStatuses;
-            }
-
-            $allowedStatusSlugs = $statusSlugWhitelist !== [] ? $statusesToQuery : $defaultStatuses;
-
             $baseApiFilters = $filters;
+
+            $statusTargets = [
+                ['slug' => 'session_scheduled', 'id' => 6],
+                ['slug' => 'selection_finalized', 'id' => 9],
+            ];
+
+            $allowedStatusIds = [6, 9];
+            $allowedStatusSlugs = array_values(array_unique(array_filter(array_map(
+                static fn (array $target): ?string => isset($target['slug']) && is_string($target['slug'])
+                    ? strtolower(trim((string) $target['slug']))
+                    : null,
+                $statusTargets
+            ))));
 
             $extractQuery = static function (string $link): array {
                 $components = parse_url($link);
@@ -264,7 +216,6 @@ return [
                 return is_array($query) ? $query : [];
             };
 
-            $statusIdWhitelist = [6, 9, 10, 12];
             $orders = [];
             $meta = [
                 'page' => $page,
@@ -274,17 +225,87 @@ return [
                 'cache_hit' => false,
                 'source' => 'crm',
             ];
+            $appliedStatusFilters = [];
+            $crmRequests = 0;
 
             $maxIterations = 30;
-            foreach ($statusesToQuery as $statusToQuery) {
+
+            $collectOrders = static function (array $batch) use (&$orders, $allowedStatusIds, $allowedStatusSlugs): int {
+                $inserted = 0;
+
+                foreach ($batch as $order) {
+                    if (!is_array($order)) {
+                        continue;
+                    }
+
+                    $status = $order['status'] ?? null;
+                    $statusId = 0;
+                    $statusSlug = null;
+                    if (is_array($status)) {
+                        $statusId = (int) ($status['id'] ?? 0);
+                        $slug = $status['slug'] ?? ($status['code'] ?? null);
+                        if (is_string($slug) && $slug !== '') {
+                            $statusSlug = strtolower($slug);
+                        }
+                    } else {
+                        $statusId = (int) ($order['status_id'] ?? $status ?? 0);
+                    }
+
+                    $slugAllowed = $statusSlug !== null && in_array($statusSlug, $allowedStatusSlugs, true);
+                    $idAllowed = in_array($statusId, $allowedStatusIds, true);
+
+                    if (!$slugAllowed && !$idAllowed) {
+                        continue;
+                    }
+
+                    $orderKey = null;
+                    if (isset($order['uuid']) && is_string($order['uuid']) && $order['uuid'] !== '') {
+                        $orderKey = 'uuid:' . strtolower($order['uuid']);
+                    } elseif (isset($order['id'])) {
+                        $orderKey = 'id:' . (string) $order['id'];
+                    }
+
+                    if ($orderKey === null) {
+                        $orders[] = $order;
+                        $inserted++;
+                        continue;
+                    }
+
+                    $isNew = !isset($orders[$orderKey]);
+                    $orders[$orderKey] = $order;
+                    if ($isNew) {
+                        $inserted++;
+                    }
+                }
+
+                return $inserted;
+            };
+
+            $fetchStatus = static function (string $statusValue) use (
+                $api,
+                $traceId,
+                $extractQuery,
+                $baseApiFilters,
+                $maxIterations,
+                &$appliedStatusFilters,
+                &$crmRequests,
+                $collectOrders
+            ): bool {
+                $statusValue = trim($statusValue);
+                if ($statusValue === '') {
+                    return false;
+                }
+
                 $apiFilters = $baseApiFilters;
-                $apiFilters['order[status]'] = $statusToQuery;
+                $apiFilters['order[status]'] = $statusValue;
                 $apiFilters['page'] = 1;
                 $apiFilters['per_page'] = 200;
 
                 $iteration = 0;
+                $totalInserted = 0;
 
                 do {
+                    $crmRequests++;
                     $response = $api->searchOrders($apiFilters, $traceId);
                     $body = $response['body'] ?? [];
                     $batch = isset($body['data']) && is_array($body['data']) ? $body['data'] : [];
@@ -293,43 +314,7 @@ return [
                         break;
                     }
 
-                    foreach ($batch as $order) {
-                        if (!is_array($order)) {
-                            continue;
-                        }
-
-                        $status = $order['status'] ?? null;
-                        $statusId = 0;
-                        $statusSlug = null;
-                        if (is_array($status)) {
-                            $statusId = (int) ($status['id'] ?? 0);
-                            $slug = $status['slug'] ?? ($status['code'] ?? null);
-                            if (is_string($slug) && $slug !== '') {
-                                $statusSlug = strtolower($slug);
-                            }
-                        } else {
-                            $statusId = (int) ($order['status_id'] ?? $status ?? 0);
-                        }
-
-                        $matchesSlug = $statusSlug !== null && in_array($statusSlug, $allowedStatusSlugs, true);
-
-                        if (!$matchesSlug && !in_array($statusId, $statusIdWhitelist, true)) {
-                            continue;
-                        }
-
-                        $orderKey = null;
-                        if (isset($order['uuid']) && is_string($order['uuid']) && $order['uuid'] !== '') {
-                            $orderKey = 'uuid:' . strtolower($order['uuid']);
-                        } elseif (isset($order['id'])) {
-                            $orderKey = 'id:' . (string) $order['id'];
-                        }
-
-                        if ($orderKey === null) {
-                            $orders[] = $order;
-                        } else {
-                            $orders[$orderKey] = $order;
-                        }
-                    }
+                    $totalInserted += $collectOrders($batch);
 
                     $links = $body['links'] ?? [];
                     $next = is_array($links) ? ($links['next'] ?? null) : null;
@@ -345,7 +330,76 @@ return [
 
                     $apiFilters = array_merge($apiFilters, $nextQuery);
                 } while (++$iteration < $maxIterations);
+
+                if (!array_key_exists($statusValue, $appliedStatusFilters)) {
+                    $appliedStatusFilters[$statusValue] = 0;
+                }
+                $appliedStatusFilters[$statusValue] += $totalInserted;
+
+                return $totalInserted > 0;
+            };
+
+            foreach ($statusTargets as $target) {
+                $slug = isset($target['slug']) && is_string($target['slug']) ? $target['slug'] : '';
+                $hasResults = $fetchStatus($slug);
+
+                if ($hasResults) {
+                    continue;
+                }
+
+                $id = isset($target['id']) ? (int) $target['id'] : 0;
+                if ($id > 0) {
+                    $fetchStatus((string) $id);
+                }
             }
+
+            if ($orders === []) {
+                $fallbackFilters = $baseApiFilters;
+                $fallbackFilters['page'] = 1;
+                $fallbackFilters['per_page'] = 200;
+
+                $iteration = 0;
+                $fallbackInserted = 0;
+
+                do {
+                    $crmRequests++;
+                    $response = $api->searchOrders($fallbackFilters, $traceId);
+                    $body = $response['body'] ?? [];
+                    $batch = isset($body['data']) && is_array($body['data']) ? $body['data'] : [];
+
+                    if ($batch === []) {
+                        break;
+                    }
+
+                    $fallbackInserted += $collectOrders($batch);
+
+                    $links = $body['links'] ?? [];
+                    $next = is_array($links) ? ($links['next'] ?? null) : null;
+
+                    if (!is_string($next) || $next === '') {
+                        break;
+                    }
+
+                    $nextQuery = $extractQuery($next);
+                    if ($nextQuery === []) {
+                        break;
+                    }
+
+                    $fallbackFilters = array_merge($fallbackFilters, $nextQuery);
+                } while (++$iteration < $maxIterations);
+
+                if ($fallbackInserted > 0) {
+                    $appliedStatusFilters['__fallback__'] = ($appliedStatusFilters['__fallback__'] ?? 0) + $fallbackInserted;
+                }
+            }
+
+            $meta['crm_requests'] = $crmRequests;
+            $meta['status_filters'] = array_map(static fn ($count): int => (int) $count, $appliedStatusFilters);
+            $meta['filters_snapshot'] = [
+                'product[slug]' => $filters['product[slug]'],
+                'order[session-start]' => $filters['order[session-start]'],
+                'order[session-end]' => $filters['order[session-end]'],
+            ];
 
             $formatSchedule = static function (?string $value): array {
                 if (!is_string($value) || trim($value) === '') {
