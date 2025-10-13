@@ -194,8 +194,8 @@ return [
             $baseApiFilters = $filters;
 
             $statusTargets = [
-                ['slug' => 'session_scheduled', 'id' => 6],
-                ['slug' => 'selection_finalized', 'id' => 9],
+                ['slug' => 'session_schedule', 'id' => 6],
+                ['slug' => 'selection_schedule_confirmed', 'id' => 9],
             ];
 
             $allowedStatusIds = [6, 9];
