@@ -8,6 +8,7 @@ use App\Application\Reports\NotClosedOrdersReport;
 use App\Application\Reports\OrdersWithoutParticipantsReport;
 use App\Application\Reports\ParticipantsUnder8Report;
 use App\Application\Reports\PresaleVsCurrentReport;
+use App\Domain\Exception\CrmRequestException;
 use App\Infrastructure\Http\EvydenciaApiClient;
 use Respect\Validation\Validator as v;
 
@@ -193,16 +194,11 @@ return [
 
             $baseApiFilters = $filters;
 
-            $statusTargets = [
-                ['slug' => 'session_schedule', 'id' => 6],
-                ['slug' => 'selection_schedule_confirmed', 'id' => 9],
-            ];
+            $statusTargets = ['session_schedule', 'selection_schedule_confirmed'];
 
             $allowedStatusIds = [6, 9];
             $allowedStatusSlugs = array_values(array_unique(array_filter(array_map(
-                static fn (array $target): ?string => isset($target['slug']) && is_string($target['slug'])
-                    ? strtolower(trim((string) $target['slug']))
-                    : null,
+                static fn (string $target): string => strtolower(trim($target)),
                 $statusTargets
             ))));
 
@@ -225,8 +221,9 @@ return [
                 'cache_hit' => false,
                 'source' => 'crm',
             ];
-            $appliedStatusFilters = [];
+            $appliedStatusFilters = array_fill_keys($statusTargets, 0);
             $crmRequests = 0;
+            $crmErrors = [];
 
             $maxIterations = 30;
 
@@ -289,11 +286,12 @@ return [
                 $maxIterations,
                 &$appliedStatusFilters,
                 &$crmRequests,
-                $collectOrders
-            ): bool {
+                $collectOrders,
+                &$crmErrors
+            ): int {
                 $statusValue = trim($statusValue);
                 if ($statusValue === '') {
-                    return false;
+                    return 0;
                 }
 
                 $apiFilters = $baseApiFilters;
@@ -306,7 +304,16 @@ return [
 
                 do {
                     $crmRequests++;
-                    $response = $api->searchOrders($apiFilters, $traceId);
+                    try {
+                        $response = $api->searchOrders($apiFilters, $traceId);
+                    } catch (CrmRequestException $exception) {
+                        $crmErrors[] = [
+                            'status_filter' => $statusValue,
+                            'status_code' => $exception->getStatusCode(),
+                            'payload' => $exception->getPayload(),
+                        ];
+                        break;
+                    }
                     $body = $response['body'] ?? [];
                     $batch = isset($body['data']) && is_array($body['data']) ? $body['data'] : [];
 
@@ -334,63 +341,13 @@ return [
                 if (!array_key_exists($statusValue, $appliedStatusFilters)) {
                     $appliedStatusFilters[$statusValue] = 0;
                 }
-                $appliedStatusFilters[$statusValue] += $totalInserted;
+                $appliedStatusFilters[$statusValue] = $totalInserted;
 
-                return $totalInserted > 0;
+                return $totalInserted;
             };
 
             foreach ($statusTargets as $target) {
-                $slug = isset($target['slug']) && is_string($target['slug']) ? $target['slug'] : '';
-                $hasResults = $fetchStatus($slug);
-
-                if ($hasResults) {
-                    continue;
-                }
-
-                $id = isset($target['id']) ? (int) $target['id'] : 0;
-                if ($id > 0) {
-                    $fetchStatus((string) $id);
-                }
-            }
-
-            if ($orders === []) {
-                $fallbackFilters = $baseApiFilters;
-                $fallbackFilters['page'] = 1;
-                $fallbackFilters['per_page'] = 200;
-
-                $iteration = 0;
-                $fallbackInserted = 0;
-
-                do {
-                    $crmRequests++;
-                    $response = $api->searchOrders($fallbackFilters, $traceId);
-                    $body = $response['body'] ?? [];
-                    $batch = isset($body['data']) && is_array($body['data']) ? $body['data'] : [];
-
-                    if ($batch === []) {
-                        break;
-                    }
-
-                    $fallbackInserted += $collectOrders($batch);
-
-                    $links = $body['links'] ?? [];
-                    $next = is_array($links) ? ($links['next'] ?? null) : null;
-
-                    if (!is_string($next) || $next === '') {
-                        break;
-                    }
-
-                    $nextQuery = $extractQuery($next);
-                    if ($nextQuery === []) {
-                        break;
-                    }
-
-                    $fallbackFilters = array_merge($fallbackFilters, $nextQuery);
-                } while (++$iteration < $maxIterations);
-
-                if ($fallbackInserted > 0) {
-                    $appliedStatusFilters['__fallback__'] = ($appliedStatusFilters['__fallback__'] ?? 0) + $fallbackInserted;
-                }
+                $fetchStatus($target);
             }
 
             $meta['crm_requests'] = $crmRequests;
@@ -400,6 +357,9 @@ return [
                 'order[session-start]' => $filters['order[session-start]'],
                 'order[session-end]' => $filters['order[session-end]'],
             ];
+            if ($crmErrors !== []) {
+                $meta['crm_errors'] = $crmErrors;
+            }
 
             $formatSchedule = static function (?string $value): array {
                 if (!is_string($value) || trim($value) === '') {
