@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Application\Services\BlacklistService;
 use App\Application\Services\CampaignService;
+use App\Application\Services\LeadOverviewService;
 use App\Application\Services\LabelService;
 use App\Application\Services\OrderService;
 use App\Application\Services\PasswordService;
@@ -14,6 +15,7 @@ use App\Application\Services\ScheduledPostService;
 use App\Application\Services\WhatsAppService;
 use App\Application\Support\ApiResponder;
 use App\Application\Support\CampaignSchedulePayloadNormalizer;
+use App\Application\Support\LeadOverviewRequestMapper;
 use App\Application\Support\QueryMapper;
 use App\Application\Support\PasswordCrypto;
 use App\Middleware\OpenApiValidationMiddleware;
@@ -242,6 +244,18 @@ return static function (ContainerBuilder $containerBuilder): void {
         ReportService::class => static function (ContainerInterface $container): ReportService {
             return new ReportService(
                 $container->get(EvydenciaApiClient::class),
+                $container->get(LoggerInterface::class)
+            );
+        },
+        LeadOverviewRequestMapper::class => static function (ContainerInterface $container): LeadOverviewRequestMapper {
+            return new LeadOverviewRequestMapper(
+                $container->get(Settings::class)
+            );
+        },
+        LeadOverviewService::class => static function (ContainerInterface $container): LeadOverviewService {
+            return new LeadOverviewService(
+                $container->get(EvydenciaApiClient::class),
+                $container->get(Settings::class),
                 $container->get(LoggerInterface::class)
             );
         },

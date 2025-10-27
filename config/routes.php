@@ -14,6 +14,7 @@ use App\Actions\Campaigns\ScheduleCampaignAction;
 use App\Actions\Docs\ViewDocsAction;
 use App\Actions\HealthCheckAction;
 use App\Actions\Labels\GenerateOrderLabelAction;
+use App\Actions\Leads\GetLeadsOverviewAction;
 use App\Actions\Orders\GetOrderDetailAction;
 use App\Actions\Orders\SearchOrdersAction;
 use App\Actions\Orders\UpdateOrderStatusAction;
@@ -155,6 +156,10 @@ return function (App $app): void {
             $campaigns->get('/schedule', GetCampaignScheduleAction::class);
             $campaigns->post('/schedule/execute', ScheduleCampaignAction::class);
             $campaigns->post('/schedule/{id}/abort', AbortScheduledCampaignAction::class);
+        });
+
+        $group->group('/leads', function (RouteCollectorProxy $leads): void {
+            $leads->get('/overview', GetLeadsOverviewAction::class);
         });
     });
 };
