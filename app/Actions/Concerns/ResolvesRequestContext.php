@@ -4,10 +4,35 @@ declare(strict_types=1);
 
 namespace App\Actions\Concerns;
 
+use Exception;
 use Psr\Http\Message\ServerRequestInterface as Request;
 
+/**
+ * Shared helpers to extract request-scoped context (trace, user, origin).
+ */
 trait ResolvesRequestContext
 {
+    protected function resolveTraceId(Request $request): string
+    {
+        $traceId = $request->getAttribute('trace_id');
+
+        if (!is_string($traceId) || $traceId === '') {
+            $headerTrace = trim($request->getHeaderLine('X-Trace-Id'));
+            if ($headerTrace !== '') {
+                $traceId = $headerTrace;
+            } else {
+                $headerRequestId = trim($request->getHeaderLine('X-Request-Id'));
+                if ($headerRequestId !== '') {
+                    $traceId = $headerRequestId;
+                } else {
+                    $traceId = $this->generateTraceId();
+                }
+            }
+        }
+
+        return $traceId;
+    }
+
     protected function resolveUserId(Request $request): ?string
     {
         $userId = $request->getAttribute('user_id');
@@ -17,16 +42,15 @@ trait ResolvesRequestContext
 
         $user = $request->getAttribute('user');
         if (is_array($user)) {
-            $candidate = $user['id'] ?? $user['uuid'] ?? null;
-            if (is_string($candidate) && $candidate !== '') {
-                return $candidate;
+            $userId = $user['id'] ?? $user['uuid'] ?? null;
+            if (is_string($userId) && $userId !== '') {
+                return $userId;
             }
         }
 
-        $header = $request->getHeaderLine('X-User-Id');
-        $header = trim($header);
-        if ($header !== '') {
-            return $header;
+        $headerUserId = trim($request->getHeaderLine('X-User-Id'));
+        if ($headerUserId !== '') {
+            return $headerUserId;
         }
 
         return null;
@@ -36,16 +60,16 @@ trait ResolvesRequestContext
     {
         $forwarded = $request->getHeaderLine('X-Forwarded-For');
         if ($forwarded !== '') {
-            $parts = array_filter(array_map('trim', explode(',', $forwarded)));
-            if ($parts !== []) {
-                return $parts[0];
+            $ips = array_filter(array_map('trim', explode(',', $forwarded)));
+            if ($ips !== []) {
+                return $ips[0];
             }
         }
 
-        $server = $request->getServerParams();
-        $remoteAddr = $server['REMOTE_ADDR'] ?? $server['SERVER_ADDR'] ?? null;
+        $serverParams = $request->getServerParams();
+        $ip = $serverParams['REMOTE_ADDR'] ?? $serverParams['SERVER_ADDR'] ?? null;
 
-        return is_string($remoteAddr) && $remoteAddr !== '' ? $remoteAddr : null;
+        return is_string($ip) && $ip !== '' ? $ip : null;
     }
 
     protected function resolveUserAgent(Request $request): ?string
@@ -54,5 +78,13 @@ trait ResolvesRequestContext
 
         return $userAgent !== '' ? $userAgent : null;
     }
-}
 
+    private function generateTraceId(): string
+    {
+        try {
+            return bin2hex(random_bytes(8));
+        } catch (Exception) {
+            return bin2hex(pack('H*', substr(sha1((string) microtime(true)), 0, 16)));
+        }
+    }
+}

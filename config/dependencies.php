@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Application\Services\BlacklistService;
 use App\Application\Services\CampaignService;
 use App\Application\Services\LeadOverviewService;
+use App\Application\Services\EventService;
 use App\Application\Services\LabelService;
 use App\Application\Services\OrderService;
 use App\Application\Services\PasswordService;
@@ -12,17 +13,23 @@ use App\Application\Services\ReportEngine;
 use App\Application\Services\ReportService;
 use App\Application\Services\ScheduledPostMediaService;
 use App\Application\Services\ScheduledPostService;
+use App\Application\Services\SchoolService;
 use App\Application\Services\WhatsAppService;
 use App\Application\Support\ApiResponder;
 use App\Application\Support\CampaignSchedulePayloadNormalizer;
 use App\Application\Support\LeadOverviewRequestMapper;
 use App\Application\Support\QueryMapper;
 use App\Application\Support\PasswordCrypto;
+use App\Actions\Monitoring\GetMetricsAction;
+use App\Infrastructure\Metrics\MetricsService;
+use App\Middleware\MetricsMiddleware;
 use App\Middleware\OpenApiValidationMiddleware;
 use App\Domain\Repositories\BlacklistRepositoryInterface;
 use App\Domain\Repositories\OrderRepositoryInterface;
+use App\Domain\Repositories\EventRepositoryInterface;
 use App\Domain\Repositories\PasswordRepositoryInterface;
 use App\Domain\Repositories\ScheduledPostRepositoryInterface;
+use App\Domain\Repositories\SchoolRepositoryInterface;
 use App\Infrastructure\Cache\RedisRateLimiter;
 use App\Infrastructure\Cache\ScheduledPostCache;
 use App\Infrastructure\Http\EvydenciaApiClient;
@@ -32,10 +39,15 @@ use App\Infrastructure\Persistence\PdoBlacklistRepository;
 use App\Infrastructure\Persistence\PdoOrderRepository;
 use App\Infrastructure\Persistence\PdoPasswordRepository;
 use App\Infrastructure\Persistence\PdoScheduledPostRepository;
+use App\Infrastructure\Persistence\PdoSchoolRepository;
+use App\Infrastructure\Persistence\PdoEventRepository;
 use App\Settings\Settings;
 use DI\ContainerBuilder;
 use GuzzleHttp\Client as HttpClient;
 use Predis\Client as PredisClient;
+use Prometheus\CollectorRegistry;
+use Prometheus\Storage\InMemory;
+use Prometheus\Storage\Redis as PrometheusRedis;
 use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 use function DI\get;
@@ -100,6 +112,20 @@ return static function (ContainerBuilder $containerBuilder): void {
             return new PdoPasswordRepository($pdo);
         },
         PasswordRepositoryInterface::class => get(PdoPasswordRepository::class),
+        PdoEventRepository::class => static function (ContainerInterface $container): PdoEventRepository {
+            /** @var \PDO|null $pdo */
+            $pdo = $container->get('db.connection');
+
+            return new PdoEventRepository($pdo);
+        },
+        EventRepositoryInterface::class => get(PdoEventRepository::class),
+        PdoSchoolRepository::class => static function (ContainerInterface $container): PdoSchoolRepository {
+            /** @var \PDO|null $pdo */
+            $pdo = $container->get('db.connection');
+
+            return new PdoSchoolRepository($pdo);
+        },
+        SchoolRepositoryInterface::class => get(PdoSchoolRepository::class),
         PasswordCrypto::class => static function (ContainerInterface $container): PasswordCrypto {
             $settings = $container->get(Settings::class)->getSecurity();
             $key = $settings['password_encryption_key'] ?? null;
@@ -141,6 +167,49 @@ return static function (ContainerBuilder $containerBuilder): void {
 
             return new PredisClient($parameters);
         },
+        CollectorRegistry::class => static function (ContainerInterface $container): CollectorRegistry {
+            $settings = $container->get(Settings::class);
+            $metrics = $settings->getMetrics();
+            $adapterName = strtolower($metrics['adapter'] ?? 'in-memory');
+            $enabled = (bool) ($metrics['enabled'] ?? false);
+
+            if ($enabled && $adapterName === 'redis' && extension_loaded('redis')) {
+                $redisConfig = $metrics['redis'] ?? [];
+                $options = [
+                    'host' => $redisConfig['host'] ?? '127.0.0.1',
+                    'port' => (int) ($redisConfig['port'] ?? 6379),
+                    'timeout' => (float) ($redisConfig['timeout'] ?? 0.1),
+                    'read_timeout' => (float) ($redisConfig['read_timeout'] ?? 10.0),
+                    'persistent_connections' => (bool) ($redisConfig['persistent_connections'] ?? false),
+                ];
+
+                if (!empty($redisConfig['password'])) {
+                    $options['password'] = $redisConfig['password'];
+                }
+
+                if (!empty($redisConfig['prefix'])) {
+                    PrometheusRedis::setPrefix((string) $redisConfig['prefix']);
+                }
+
+                $adapter = new PrometheusRedis($options);
+            } else {
+                if ($enabled && $adapterName === 'redis' && !extension_loaded('redis')) {
+                    /** @var LoggerInterface $logger */
+                    $logger = $container->get(LoggerInterface::class);
+                    $logger->warning('Metrics configured to use redis adapter but ext-redis is not loaded. Falling back to in-memory adapter.');
+                }
+
+                $adapter = new InMemory();
+            }
+
+            return new CollectorRegistry($adapter);
+        },
+        MetricsService::class => static function (ContainerInterface $container): MetricsService {
+            return new MetricsService(
+                $container->get(CollectorRegistry::class),
+                $container->get(Settings::class)
+            );
+        },
         RedisRateLimiter::class => static function (ContainerInterface $container): RedisRateLimiter {
             /** @var PredisClient|null $client */
             $client = $container->get('redis.client');
@@ -170,6 +239,9 @@ return static function (ContainerBuilder $containerBuilder): void {
         },
         ApiResponder::class => static function (ContainerInterface $container): ApiResponder {
             return new ApiResponder($container->get(Settings::class));
+        },
+        MetricsMiddleware::class => static function (ContainerInterface $container): MetricsMiddleware {
+            return new MetricsMiddleware($container->get(MetricsService::class));
         },
         CampaignSchedulePayloadNormalizer::class => static function (ContainerInterface $container): CampaignSchedulePayloadNormalizer {
             return new CampaignSchedulePayloadNormalizer($container->get(Settings::class));
@@ -214,10 +286,21 @@ return static function (ContainerBuilder $containerBuilder): void {
                 $container->get(LoggerInterface::class)
             );
         },
+        SchoolService::class => static function (ContainerInterface $container): SchoolService {
+            return new SchoolService(
+                $container->get(SchoolRepositoryInterface::class),
+                $container->get(LoggerInterface::class)
+            );
+        },
         ScheduledPostMediaService::class => static function (ContainerInterface $container): ScheduledPostMediaService {
             return new ScheduledPostMediaService(
                 $container->get(Settings::class),
                 $container->get(LoggerInterface::class)
+            );
+        },
+        EventService::class => static function (ContainerInterface $container): EventService {
+            return new EventService(
+                $container->get(EventRepositoryInterface::class)
             );
         },
         WhatsAppService::class => static function (ContainerInterface $container): WhatsAppService {
@@ -257,6 +340,12 @@ return static function (ContainerBuilder $containerBuilder): void {
                 $container->get(EvydenciaApiClient::class),
                 $container->get(Settings::class),
                 $container->get(LoggerInterface::class)
+            );
+        },
+        GetMetricsAction::class => static function (ContainerInterface $container): GetMetricsAction {
+            return new GetMetricsAction(
+                $container->get(MetricsService::class),
+                $container->get(Settings::class)
             );
         },
         CampaignService::class => static function (ContainerInterface $container): CampaignService {

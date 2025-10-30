@@ -12,11 +12,17 @@
     "endroid/qr-code": "^4.0",
     "respect/validation": "^2.2",
     "tuupola/cors-middleware": "^1.4",
-    "middlewares/trailing-slash": "^2.0"
+    "middlewares/trailing-slash": "^2.0",
+    "promphp/prometheus_client_php": "2.10"
   },
   "autoload": {
     "psr-4": {
       "App\\": "app/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Tests\\": "tests/"
     }
   },
   "scripts": {
@@ -28,6 +34,8 @@
   },
   "require-dev": {
     "zircote/swagger-php": "^4.10",
-    "league/openapi-psr7-validator": "^0.16"
+    "league/openapi-psr7-validator": "^0.16",
+    "doctrine/migrations": "3.8",
+    "phpunit/phpunit": "11.1"
   }
 }

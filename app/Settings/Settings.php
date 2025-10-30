@@ -112,6 +112,14 @@ final class Settings
         return $this->get('security', []);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    public function getMetrics(): array
+    {
+        return $this->get('metrics', []);
+    }
+
     public function getApiKey(): ?string
     {
         $app = $this->getApp();

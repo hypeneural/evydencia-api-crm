@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Application\Support\ApiResponder;
 use App\Middleware\ApiKeyMiddleware;
 use App\Middleware\CorsMiddleware;
+use App\Middleware\MetricsMiddleware;
 use App\Middleware\RateLimitMiddleware;
 use App\Middleware\RequestLoggingMiddleware;
 use App\Middleware\OpenApiValidationMiddleware;
@@ -29,6 +30,7 @@ return function (App $app): void {
     $app->add($container->get(RateLimitMiddleware::class));
     $app->add($container->get(ApiKeyMiddleware::class));
     $app->add($container->get(RequestLoggingMiddleware::class));
+    $app->add($container->get(MetricsMiddleware::class));
 
     /** @var Settings $settings */
     $settings = $container->get(Settings::class);

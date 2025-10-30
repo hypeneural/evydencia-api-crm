@@ -11,6 +11,30 @@ use App\Actions\Blacklist\UpdateBlacklistEntryAction;
 use App\Actions\Campaigns\AbortScheduledCampaignAction;
 use App\Actions\Campaigns\GetCampaignScheduleAction;
 use App\Actions\Campaigns\ScheduleCampaignAction;
+use App\Actions\Monitoring\GetMetricsAction;
+use App\Actions\Schools\CreateSchoolObservationAction;
+use App\Actions\Schools\DeleteSchoolObservationAction;
+use App\Actions\Schools\EnqueueSchoolSyncMutationsAction;
+use App\Actions\Schools\FilterCitiesAction;
+use App\Actions\Schools\FilterNeighborhoodsAction;
+use App\Actions\Schools\FilterPeriodsAction;
+use App\Actions\Schools\GetSchoolAction;
+use App\Actions\Schools\GetSchoolKpiHistoricoAction;
+use App\Actions\Schools\GetSchoolKpiOverviewAction;
+use App\Actions\Schools\GetSchoolSyncChangesAction;
+use App\Actions\Schools\ListCityAggregatesAction;
+use App\Actions\Schools\ListSchoolObservationsAction;
+use App\Actions\Schools\ListSchoolPanfletagemLogsAction;
+use App\Actions\Schools\ListSchoolsAction;
+use App\Actions\Schools\ListNeighborhoodAggregatesAction;
+use App\Actions\Schools\UpdateSchoolAction;
+use App\Actions\Schools\UpdateSchoolObservationAction;
+use App\Actions\Events\CreateEventAction;
+use App\Actions\Events\DeleteEventAction;
+use App\Actions\Events\GetEventAction;
+use App\Actions\Events\ListEventLogsAction;
+use App\Actions\Events\ListEventsAction;
+use App\Actions\Events\UpdateEventAction;
 use App\Actions\Docs\ViewDocsAction;
 use App\Actions\HealthCheckAction;
 use App\Actions\Labels\GenerateOrderLabelAction;
@@ -74,8 +98,12 @@ use Slim\Routing\RouteCollectorProxy;
 return function (App $app): void {
     $app->get('/doc', ViewDocsAction::class);
     $app->get('/health', HealthCheckAction::class);
+    $app->get('/metrics', GetMetricsAction::class);
 
     $app->group('/v1', function (RouteCollectorProxy $group): void {
+        $group->get('/cidades', ListCityAggregatesAction::class);
+        $group->get('/cidades/{cidadeId:[0-9]+}/bairros', ListNeighborhoodAggregatesAction::class);
+
         $group->group('/blacklist', function (RouteCollectorProxy $blacklist): void {
             $blacklist->get('', ListBlacklistAction::class);
             $blacklist->post('', CreateBlacklistEntryAction::class);
@@ -160,6 +188,42 @@ return function (App $app): void {
 
         $group->group('/leads', function (RouteCollectorProxy $leads): void {
             $leads->get('/overview', GetLeadsOverviewAction::class);
+        });
+
+        $group->group('/escolas', function (RouteCollectorProxy $schools): void {
+            $schools->get('', ListSchoolsAction::class);
+            $schools->get('/{id:[0-9]+}', GetSchoolAction::class);
+            $schools->patch('/{id:[0-9]+}', UpdateSchoolAction::class);
+            $schools->post('/{id:[0-9]+}/observacoes', CreateSchoolObservationAction::class);
+            $schools->get('/{id:[0-9]+}/observacoes', ListSchoolObservationsAction::class);
+            $schools->put('/{id:[0-9]+}/observacoes/{observacao_id:[0-9]+}', UpdateSchoolObservationAction::class);
+            $schools->delete('/{id:[0-9]+}/observacoes/{observacao_id:[0-9]+}', DeleteSchoolObservationAction::class);
+            $schools->get('/{id:[0-9]+}/panfletagem/logs', ListSchoolPanfletagemLogsAction::class);
+        });
+
+        $group->group('/filtros', function (RouteCollectorProxy $filters): void {
+            $filters->get('/cidades', FilterCitiesAction::class);
+            $filters->get('/bairros', FilterNeighborhoodsAction::class);
+            $filters->get('/periodos', FilterPeriodsAction::class);
+        });
+
+        $group->group('/kpis', function (RouteCollectorProxy $kpis): void {
+            $kpis->get('/overview', GetSchoolKpiOverviewAction::class);
+            $kpis->get('/historico', GetSchoolKpiHistoricoAction::class);
+        });
+
+        $group->group('/sync', function (RouteCollectorProxy $sync): void {
+            $sync->post('/mutations', EnqueueSchoolSyncMutationsAction::class);
+            $sync->get('/changes', GetSchoolSyncChangesAction::class);
+        });
+
+        $group->group('/eventos', function (RouteCollectorProxy $events): void {
+            $events->get('', ListEventsAction::class);
+            $events->post('', CreateEventAction::class);
+            $events->get('/{id:[0-9]+}', GetEventAction::class);
+            $events->patch('/{id:[0-9]+}', UpdateEventAction::class);
+            $events->delete('/{id:[0-9]+}', DeleteEventAction::class);
+            $events->get('/{id:[0-9]+}/logs', ListEventLogsAction::class);
         });
     });
 };

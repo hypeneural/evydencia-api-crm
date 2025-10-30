@@ -43,6 +43,41 @@ return [
     'rate_limit' => [
         'per_minute' => max(1, (int) ($_ENV['RATE_LIMIT_PER_MINUTE'] ?? 60)),
         'window' => 60,
+        'paths' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', $_ENV['RATE_LIMIT_PATHS'] ?? '/v1/escolas')
+        ))),
+    ],
+    'metrics' => [
+        'enabled' => filter_var($_ENV['METRICS_ENABLED'] ?? 'false', FILTER_VALIDATE_BOOL),
+        'namespace' => $_ENV['METRICS_NAMESPACE'] ?? 'escola_connect_api',
+        'adapter' => strtolower($_ENV['METRICS_ADAPTER'] ?? 'in-memory'),
+        'auth_token' => $_ENV['METRICS_AUTH_TOKEN'] ?? null,
+        'http_buckets' => array_values(array_filter(array_map(
+            static function ($value): ?float {
+                $value = is_string($value) ? trim($value) : null;
+                if ($value === null || $value === '') {
+                    return null;
+                }
+
+                $float = (float) $value;
+                return $float > 0 ? $float : null;
+            },
+            explode(',', (string) ($_ENV['METRICS_HTTP_BUCKETS'] ?? ''))
+        ))),
+        'redis' => [
+            'host' => $_ENV['METRICS_REDIS_HOST'] ?? ($_ENV['REDIS_HOST'] ?? '127.0.0.1'),
+            'port' => (int) ($_ENV['METRICS_REDIS_PORT'] ?? ($_ENV['REDIS_PORT'] ?? 6379)),
+            'password' => $_ENV['METRICS_REDIS_PASSWORD'] ?? ($_ENV['REDIS_PASSWORD'] ?? null),
+            'timeout' => isset($_ENV['METRICS_REDIS_TIMEOUT'])
+                ? (float) $_ENV['METRICS_REDIS_TIMEOUT']
+                : (isset($_ENV['REDIS_TIMEOUT']) ? (float) $_ENV['REDIS_TIMEOUT'] : 0.1),
+            'read_timeout' => isset($_ENV['METRICS_REDIS_READ_TIMEOUT'])
+                ? (float) $_ENV['METRICS_REDIS_READ_TIMEOUT']
+                : 10.0,
+            'persistent_connections' => filter_var($_ENV['METRICS_REDIS_PERSISTENT'] ?? 'false', FILTER_VALIDATE_BOOL),
+            'prefix' => $_ENV['METRICS_REDIS_PREFIX'] ?? 'PROMETHEUS_',
+        ],
     ],
     'crm' => [
         'base_url' => rtrim($_ENV['CRM_BASE_URL'] ?? 'https://evydencia.com/api', '/'),

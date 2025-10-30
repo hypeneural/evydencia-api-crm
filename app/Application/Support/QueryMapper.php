@@ -378,6 +378,42 @@ final class QueryMapper
         return new QueryOptions($crmQuery, $page, $perPage, $fetchAll, $sort, $fields);
     }
 
+    public function mapSchools(array $queryParams): QueryOptions
+    {
+        [$page, $perPage] = $this->resolvePagination($queryParams);
+        $fetchAll = $this->normalizeFetch($queryParams['fetch'] ?? ($queryParams['all'] ?? null));
+
+        $filters = $this->normalizeArray($queryParams['filter'] ?? []);
+        $mappedFilters = $this->mapSchoolFilters($filters);
+
+        $inline = $this->extractSchoolInlineFilters($queryParams);
+        if ($inline !== []) {
+            $mappedFilters = array_merge($mappedFilters, $this->mapSchoolFilters($inline));
+        }
+
+        $crmQuery = [];
+        if ($mappedFilters !== []) {
+            $crmQuery['filters'] = $mappedFilters;
+        }
+
+        $search = $this->sanitizeScalar($queryParams['search'] ?? null);
+        if ($search !== '') {
+            $crmQuery['search'] = $search;
+        }
+
+        $sort = $this->parseSort($queryParams['sort'] ?? null);
+        $fields = $this->parseFields($queryParams['fields'] ?? []);
+
+        return new QueryOptions(
+            $crmQuery,
+            $page,
+            $perPage,
+            $fetchAll,
+            $this->filterSchoolSort($sort),
+            $fields
+        );
+    }
+
     public function mapCampaignSchedule(array $queryParams): QueryOptions
     {
         [$page, $perPage] = $this->resolvePagination($queryParams);
@@ -1383,6 +1419,121 @@ final class QueryMapper
         }
 
         return $result;
+    }
+
+    /**
+     * @param array<int, array{field: string, direction: string}> $sort
+     * @return array<int, array{field: string, direction: string}>
+     */
+    private function filterSchoolSort(array $sort): array
+    {
+        if ($sort === []) {
+            return [];
+        }
+
+        $allowed = ['nome', 'total_alunos', 'panfletagem', 'cidade'];
+
+        return array_values(array_filter(
+            $sort,
+            static fn (array $rule): bool => in_array($rule['field'], $allowed, true)
+        ));
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<string, mixed>
+     */
+    private function mapSchoolFilters(array $filters): array
+    {
+        $mapped = [];
+
+        $cidade = $this->normalizeIntList($filters['cidade_id'] ?? null);
+        if ($cidade !== []) {
+            $mapped['cidade_id'] = $cidade;
+        }
+
+        $bairro = $this->normalizeIntList($filters['bairro_id'] ?? null);
+        if ($bairro !== []) {
+            $mapped['bairro_id'] = $bairro;
+        }
+
+        $status = $this->sanitizeScalar($filters['status'] ?? null);
+        if (in_array($status, ['pendente', 'feito', 'todos'], true)) {
+            $mapped['status'] = $status;
+        }
+
+        $tipos = $this->normalizeStringList($filters['tipo'] ?? null);
+        if ($tipos !== []) {
+            $mapped['tipo'] = $tipos;
+        }
+
+        $periodos = $this->normalizeStringList($filters['periodos'] ?? null);
+        if ($periodos !== []) {
+            $mapped['periodos'] = $periodos;
+        }
+
+        return $mapped;
+    }
+
+    /**
+     * @param array<string, mixed> $queryParams
+     * @return array<string, mixed>
+     */
+    private function extractSchoolInlineFilters(array $queryParams): array
+    {
+        $inline = [];
+
+        foreach (['cidade_id', 'bairro_id', 'status', 'tipo', 'periodos'] as $key) {
+            if (!array_key_exists($key, $queryParams)) {
+                continue;
+            }
+
+            $inline[$key] = $queryParams[$key];
+        }
+
+        return $inline;
+    }
+
+    /**
+     * @param mixed $value
+     * @return array<int, int>
+     */
+    private function normalizeIntList(mixed $value): array
+    {
+        if ($value === null) {
+            return [];
+        }
+
+        if (is_array($value)) {
+            $list = array_map(static fn ($item): int => (int) $item, $value);
+        } else {
+            $list = [(int) $value];
+        }
+
+        $list = array_filter($list, static fn (int $item): bool => $item > 0);
+
+        return array_values(array_unique($list));
+    }
+
+    /**
+     * @param mixed $value
+     * @return array<int, string>
+     */
+    private function normalizeStringList(mixed $value): array
+    {
+        if ($value === null) {
+            return [];
+        }
+
+        if (is_array($value)) {
+            $list = array_map(static fn ($item): string => trim((string) $item), $value);
+        } else {
+            $list = [trim((string) $value)];
+        }
+
+        $list = array_filter($list, static fn (string $item): bool => $item !== '');
+
+        return array_values(array_unique($list));
     }
 }
 

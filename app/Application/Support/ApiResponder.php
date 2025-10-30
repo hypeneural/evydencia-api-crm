@@ -156,6 +156,10 @@ final class ApiResponder
             $normalized['elapsed_ms'] = $meta['elapsed_ms'];
         }
 
+        if (isset($meta['filters']) && is_array($meta['filters'])) {
+            $normalized['filters'] = $meta['filters'];
+        }
+
         if (isset($meta['extra']) && is_array($meta['extra'])) {
             $normalized = array_merge($normalized, $meta['extra']);
         }

@@ -30,6 +30,7 @@ final class RateLimitMiddleware implements MiddlewareInterface
         $rateLimitSettings = $this->settings->getRateLimit();
         $limit = (int) ($rateLimitSettings['per_minute'] ?? 60);
         $window = (int) ($rateLimitSettings['window'] ?? 60);
+        $paths = $this->normalizePaths($rateLimitSettings['paths'] ?? ['*']);
 
         if (!$this->rateLimiter->isEnabled() || $limit <= 0) {
             return $handler->handle($request);
@@ -48,7 +49,11 @@ final class RateLimitMiddleware implements MiddlewareInterface
         }
 
         $route = RouteContext::fromRequest($request)->getRoute();
-        $endpoint = $route?->getPattern() ?? $request->getUri()->getPath();
+        $endpoint = $this->normalizeEndpoint($route?->getPattern() ?? $request->getUri()->getPath());
+
+        if (!$this->shouldRateLimit($endpoint, $paths)) {
+            return $handler->handle($request);
+        }
 
         $key = sprintf('rate_limit:%s:%s', sha1((string) $ipAddress), sha1($endpoint));
         $result = $this->rateLimiter->hit($key, $limit, $window);
@@ -84,5 +89,47 @@ final class RateLimitMiddleware implements MiddlewareInterface
 
         return $response;
     }
-}
 
+    /**
+     * @param array<int, string> $paths
+     * @return array<int, string>
+     */
+    private function normalizePaths(array $paths): array
+    {
+        $normalized = array_values(array_filter(array_map(
+            static fn ($path): string => trim((string) $path),
+            $paths
+        )));
+
+        return $normalized === [] ? ['*'] : $normalized;
+    }
+
+    private function normalizeEndpoint(?string $endpoint): string
+    {
+        if (!is_string($endpoint) || $endpoint === '') {
+            return '/';
+        }
+
+        return str_starts_with($endpoint, '/') ? $endpoint : '/' . $endpoint;
+    }
+
+    /**
+     * @param array<int, string> $paths
+     */
+    private function shouldRateLimit(string $endpoint, array $paths): bool
+    {
+        foreach ($paths as $path) {
+            if ($path === '*') {
+                return true;
+            }
+
+            $normalized = $this->normalizeEndpoint($path);
+
+            if ($endpoint === $normalized || str_starts_with($endpoint, rtrim($normalized, '/') . '/')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}

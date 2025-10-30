@@ -1,0 +1,1087 @@
+openapi: 3.0.3
+info:
+  title: Escola Connect API - Modulo de Escolas
+  version: 1.0.0
+  description: >
+    Especificacao dos endpoints responsaveis por cidades, bairros, escolas,
+    filtros, KPIs e sincronizacao offline.
+servers:
+  - url: https://api.evyconnect.local/api
+    description: Ambiente interno
+  - url: http://localhost/api
+    description: Desenvolvimento local
+components:
+  securitySchemes:
+    ApiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+  schemas:
+    EnvelopeSuccessList:
+      type: object
+      required: [success, data, meta, links, trace_id]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items: {}
+        meta:
+          $ref: '#/components/schemas/Meta'
+        links:
+          $ref: '#/components/schemas/Links'
+        trace_id:
+          type: string
+          example: 82db5249bb04efcd
+    EnvelopeSuccessResource:
+      type: object
+      required: [success, data, meta, links, trace_id]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+        meta:
+          $ref: '#/components/schemas/Meta'
+        links:
+          $ref: '#/components/schemas/Links'
+        trace_id:
+          type: string
+    EnvelopeError:
+      type: object
+      required: [success, error, trace_id]
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              example: conflict
+            message:
+              type: string
+              example: Registro desatualizado.
+            errors:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                  message:
+                    type: string
+        trace_id:
+          type: string
+    Meta:
+      type: object
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        per_page:
+          type: integer
+          minimum: 1
+        total:
+          type: integer
+          minimum: 0
+        count:
+          type: integer
+          minimum: 0
+        total_pages:
+          type: integer
+          minimum: 1
+        source:
+          type: string
+        filters:
+          type: object
+          description: ecoa filtros aplicados na consulta
+        etag:
+          type: string
+          description: presente em agregadores quando cache esta ativo
+        elapsed_ms:
+          type: integer
+          description: tempo de processamento reportado por algumas rotas
+    Links:
+      type: object
+      properties:
+        self:
+          type: string
+        next:
+          type: string
+          nullable: true
+        prev:
+          type: string
+          nullable: true
+    CityAggregate:
+      type: object
+      required:
+        - id
+        - nome
+        - sigla_uf
+        - totais
+        - periodos
+        - etapas
+        - atualizado_em
+        - versao_row
+      properties:
+        id:
+          type: integer
+        nome:
+          type: string
+        sigla_uf:
+          type: string
+        totais:
+          type: object
+          properties:
+            total_escolas:
+              type: integer
+            total_bairros:
+              type: integer
+            total_alunos:
+              type: integer
+            panfletagem_feita:
+              type: integer
+            panfletagem_pendente:
+              type: integer
+        periodos:
+          $ref: '#/components/schemas/PeriodosAggregate'
+        etapas:
+          $ref: '#/components/schemas/Etapas'
+        atualizado_em:
+          type: string
+          format: date-time
+        versao_row:
+          type: integer
+        bairros:
+          type: array
+          items:
+            $ref: '#/components/schemas/NeighborhoodAggregate'
+    NeighborhoodAggregate:
+      type: object
+      required:
+        - id
+        - nome
+        - cidade_id
+        - totais
+        - periodos
+        - etapas
+        - atualizado_em
+        - versao_row
+      properties:
+        id:
+          type: integer
+        nome:
+          type: string
+        cidade_id:
+          type: integer
+        totais:
+          type: object
+          properties:
+            total_escolas:
+              type: integer
+            total_alunos:
+              type: integer
+            panfletagem_feita:
+              type: integer
+            panfletagem_pendente:
+              type: integer
+        periodos:
+          $ref: '#/components/schemas/PeriodosAggregate'
+        etapas:
+          $ref: '#/components/schemas/Etapas'
+        atualizado_em:
+          type: string
+          format: date-time
+        versao_row:
+          type: integer
+        escolas:
+          type: array
+          description: presente apenas quando withEscolas=true
+          items:
+            $ref: '#/components/schemas/SchoolSummary'
+    SchoolSummary:
+      type: object
+      required:
+        - id
+        - cidade_id
+        - cidade_nome
+        - cidade_sigla_uf
+        - bairro_id
+        - bairro_nome
+        - tipo
+        - nome
+        - total_alunos
+        - panfletagem
+        - versao_row
+        - criado_em
+        - atualizado_em
+        - periodos
+      properties:
+        id:
+          type: integer
+        cidade_id:
+          type: integer
+        cidade_nome:
+          type: string
+        cidade_sigla_uf:
+          type: string
+        bairro_id:
+          type: integer
+        bairro_nome:
+          type: string
+        tipo:
+          type: string
+          example: CEI
+        nome:
+          type: string
+        diretor:
+          type: string
+          nullable: true
+        endereco:
+          type: string
+          nullable: true
+        total_alunos:
+          type: integer
+        panfletagem:
+          type: boolean
+        panfletagem_atualizado_em:
+          type: string
+          format: date-time
+          nullable: true
+        panfletagem_usuario:
+          $ref: '#/components/schemas/UsuarioResumo'
+        indicadores:
+          $ref: '#/components/schemas/Indicadores'
+        obs:
+          type: string
+          nullable: true
+        versao_row:
+          type: integer
+        criado_em:
+          type: string
+          format: date-time
+          nullable: true
+        atualizado_em:
+          type: string
+          format: date-time
+          nullable: true
+        periodos:
+          type: array
+          items:
+            $ref: '#/components/schemas/Periodo'
+    SchoolDetail:
+      allOf:
+        - $ref: '#/components/schemas/SchoolSummary'
+        - type: object
+          required: [etapas]
+          properties:
+            etapas:
+              $ref: '#/components/schemas/Etapas'
+    Periodo:
+      type: string
+      enum: [Matutino, Vespertino, Noturno]
+    PeriodosAggregate:
+      type: object
+      additionalProperties:
+        type: integer
+      description: chave = periodo, valor = total de escolas
+    Etapas:
+      type: object
+      properties:
+        bercario_0a1: { type: integer }
+        bercario_1a2: { type: integer }
+        maternal_2a3: { type: integer }
+        jardim_3a4: { type: integer }
+        preI_4a5: { type: integer }
+        preII_5a6: { type: integer }
+        ano1_6a7: { type: integer }
+        ano2_7a8: { type: integer }
+        ano3_8a9: { type: integer }
+        ano4_9a10: { type: integer }
+    Indicadores:
+      type: object
+      properties:
+        tem_bercario: { type: boolean }
+        tem_maternal: { type: boolean }
+        tem_jardim: { type: boolean }
+        tem_pre: { type: boolean }
+        tem_fund1: { type: boolean }
+    UsuarioResumo:
+      type: object
+      nullable: true
+      properties:
+        id:
+          type: integer
+        nome:
+          type: string
+    SchoolObservation:
+      type: object
+      required: [id, observacao, criado_em]
+      properties:
+        id:
+          type: integer
+        observacao:
+          type: string
+        autor:
+          $ref: '#/components/schemas/UsuarioResumo'
+        criado_em:
+          type: string
+          format: date-time
+    SchoolPanfletagemLog:
+      type: object
+      required: [id, status_anterior, status_novo]
+      properties:
+        id:
+          type: integer
+        status_anterior:
+          type: boolean
+        status_novo:
+          type: boolean
+        observacao:
+          type: string
+          nullable: true
+        usuario:
+          $ref: '#/components/schemas/UsuarioResumo'
+        criado_em:
+          type: string
+          format: date-time
+          nullable: true
+    SyncMutationsRequest:
+      type: object
+      required: [mutations]
+      properties:
+        client_id:
+          type: string
+          example: device-automated-test
+        mutations:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncMutationItem'
+    SyncMutationItem:
+      type: object
+      required:
+        - payload
+      properties:
+        client_id:
+          type: string
+        tipo:
+          type: string
+          description: chave oficial usada pelo servico
+          example: updateEscola
+        type:
+          type: string
+          description: alias aceito para compatibilidade (transformado em "tipo")
+        payload:
+          type: object
+          description: dados enviados pelo cliente
+        updates:
+          type: object
+          description: alias aceito; mesclado com "payload"
+        escola_id:
+          type: integer
+        client_mutation_id:
+          type: string
+        versao_row:
+          type: integer
+          nullable: true
+    SyncMutationsResponse:
+      type: object
+      required: [mutations]
+      properties:
+        mutations:
+          type: array
+          items:
+            type: object
+            required: [id, client_id, tipo, status]
+            properties:
+              id: { type: integer }
+              client_id: { type: string }
+              tipo: { type: string }
+              status: { type: string, example: pending }
+              client_mutation_id: { type: string }
+              escola_id: { type: integer }
+    SyncChangesData:
+      type: object
+      required: [cidades, bairros, escolas, next_since]
+      properties:
+        cidades:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              nome: { type: string }
+              sigla_uf: { type: string }
+              criado_em: { type: string, format: date-time }
+              atualizado_em: { type: string, format: date-time }
+        bairros:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              cidade_id: { type: integer }
+              nome: { type: string }
+              criado_em: { type: string, format: date-time }
+              atualizado_em: { type: string, format: date-time }
+        escolas:
+          type: array
+          items:
+            type: object
+            allOf:
+              - $ref: '#/components/schemas/SchoolSummary'
+              - type: object
+                required: [periodos, etapas]
+                properties:
+                  periodos:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Periodo'
+                  etapas:
+                    $ref: '#/components/schemas/Etapas'
+        next_since:
+          type: string
+          format: date-time
+    KPIOverview:
+      type: object
+      properties:
+        total_escolas: { type: integer }
+        total_panfletagem_feita: { type: integer }
+        total_panfletagem_pendente: { type: integer }
+        etapas:
+          $ref: '#/components/schemas/Etapas'
+        turnos:
+          type: array
+          items:
+            type: object
+            properties:
+              periodo: { type: string }
+              escolas: { type: integer }
+        bairros_top:
+          type: array
+          items:
+            type: object
+            properties:
+              bairro_id: { type: integer }
+              bairro_nome: { type: string }
+              pendentes: { type: integer }
+              total: { type: integer }
+    KPIHistoricoItem:
+      type: object
+      properties:
+        periodo: { type: string }
+        feitas: { type: integer }
+        pendentes: { type: integer }
+security:
+  - ApiKey: []
+paths:
+  /v1/cidades:
+    get:
+      tags: [Escolas]
+      summary: Lista cidades com agregados de escolas
+      parameters:
+        - in: query
+          name: includeBairros
+          schema:
+            type: boolean
+          description: quando true, inclui bairros e opcionalmente suas escolas
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: filter[bairro_id][]
+          schema:
+            type: integer
+        - in: query
+          name: filter[tipo][]
+          schema:
+            type: string
+        - in: query
+          name: filter[status]
+          schema:
+            type: string
+            enum: [pendente, feito, todos]
+        - in: query
+          name: filter[periodos][]
+          schema:
+            $ref: '#/components/schemas/Periodo'
+      responses:
+        '200':
+          description: Agregados retornados
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/EnvelopeSuccessList'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/CityAggregate'
+        '500':
+          description: Erro interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+  /v1/sync/mutations:
+    post:
+      tags: [Escolas]
+      summary: Enfileira mutacoes provenientes do modo offline
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncMutationsRequest'
+      responses:
+        '200':
+          description: Mutations registradas
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/EnvelopeSuccessResource'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SyncMutationsResponse'
+        '422':
+          description: Payload invalido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+        '500':
+          description: Erro interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+  /v1/sync/changes:
+    get:
+      tags: [Escolas]
+      summary: Recupera mudancas para sincronizacao offline
+      parameters:
+        - { in: query, name: since, schema: { type: string, format: date-time }, description: cursor ISO8601 }
+        - { in: query, name: sinceVersion, schema: { type: integer, minimum: 0 }, description: alias aceito para clientes antigos }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 500 }, description: limite de registros por entidade }
+      responses:
+        '200':
+          description: Delta de dados desde o marcador informado
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/EnvelopeSuccessResource'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SyncChangesData'
+        '500':
+          description: Erro interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+  /v1/escolas/{id}/panfletagem/logs:
+    get:
+      tags: [Escolas]
+      summary: Lista logs de panfletagem
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+        - { in: query, name: page, schema: { type: integer, minimum: 1 } }
+        - { in: query, name: per_page, schema: { type: integer, minimum: 1, maximum: 100 } }
+      responses:
+        '200':
+          description: Logs paginados
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/EnvelopeSuccessList'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SchoolPanfletagemLog'
+        '422':
+          description: Parametros invalidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+        '500':
+          description: Erro interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+  /v1/escolas/{id}/observacoes:
+    get:
+      tags: [Escolas]
+      summary: Lista observacoes da escola
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+        - { in: query, name: page, schema: { type: integer, minimum: 1 } }
+        - { in: query, name: per_page, schema: { type: integer, minimum: 1, maximum: 100 } }
+      responses:
+        '200':
+          description: Historico de observacoes
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/EnvelopeSuccessList'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SchoolObservation'
+        '500':
+          description: Erro interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+    post:
+      tags: [Escolas]
+      summary: Cria observacao para a escola
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [observacao]
+              properties:
+                observacao:
+                  type: string
+      responses:
+        '201':
+          description: Observacao criada
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/EnvelopeSuccessResource'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SchoolObservation'
+        '422':
+          description: Payload invalido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+        '500':
+          description: Erro interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+  /v1/escolas/{id}/observacoes/{observacao_id}:
+    put:
+      tags: [Escolas]
+      summary: Atualiza observacao existente
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+        - { in: path, name: observacao_id, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [observacao]
+              properties:
+                observacao:
+                  type: string
+      responses:
+        '200':
+          description: Observacao atualizada
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/EnvelopeSuccessResource'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SchoolObservation'
+        '404':
+          description: Observacao nao encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+        '422':
+          description: Payload invalido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+    delete:
+      tags: [Escolas]
+      summary: Remove observacao
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+        - { in: path, name: observacao_id, required: true, schema: { type: integer } }
+      responses:
+        '204':
+          description: Observacao removida
+        '404':
+          description: Observacao nao encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+  /v1/filtros/cidades:
+    get:
+      tags: [Escolas]
+      summary: Filtro de cidades com totais
+      responses:
+        '200':
+          description: Lista de cidades suportadas pelo filtro
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/EnvelopeSuccessList'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: { type: integer }
+                            nome: { type: string }
+                            sigla_uf: { type: string }
+                            total_escolas: { type: integer }
+                            total_pendentes: { type: integer }
+        '500':
+          description: Erro interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+  /v1/filtros/bairros:
+    get:
+      tags: [Escolas]
+      summary: Filtro de bairros
+      parameters:
+        - { in: query, name: cidade_id, schema: { type: integer } }
+        - { in: query, name: includeTotals, schema: { type: boolean }, description: retorna totais agregados quando true }
+      responses:
+        '200':
+          description: Lista de bairros
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/EnvelopeSuccessList'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: { type: integer }
+                            nome: { type: string }
+                            cidade_id: { type: integer }
+                            total_escolas: { type: integer }
+                            total_pendentes: { type: integer }
+        '500':
+          description: Erro interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+  /v1/filtros/periodos:
+    get:
+      tags: [Escolas]
+      summary: Lista periodos habilitados
+      responses:
+        '200':
+          description: Lista de periodos (Matutino/Vespertino/Noturno)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/EnvelopeSuccessList'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: { type: string }
+                            nome: { type: string }
+        '500':
+          description: Erro interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+  /v1/kpis/overview:
+    get:
+      tags: [Escolas]
+      summary: KPIs gerais do modulo de escolas
+      parameters:
+        - { in: query, name: cidade_id, schema: { type: integer } }
+        - { in: query, name: bairro_id, schema: { type: integer } }
+        - { in: query, name: status, schema: { type: string, enum: [pendente, feito, todos] } }
+      responses:
+        '200':
+          description: Indicadores consolidados
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/EnvelopeSuccessResource'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/KPIOverview'
+        '500':
+          description: Erro interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+  /v1/kpis/historico:
+    get:
+      tags: [Escolas]
+      summary: Historico diario de panfletagem
+      parameters:
+        - { in: query, name: cidade_id, schema: { type: integer } }
+        - { in: query, name: bairro_id, schema: { type: integer } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 180 } }
+      responses:
+        '200':
+          description: Serie temporal (lista de dias)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/EnvelopeSuccessList'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/KPIHistoricoItem'
+        '500':
+          description: Erro interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+  /v1/escolas:
+    get:
+      tags: [Escolas]
+      summary: Lista escolas com filtros
+      parameters:
+        - { in: query, name: page, schema: { type: integer, minimum: 1 } }
+        - { in: query, name: per_page, schema: { type: integer, minimum: 1, maximum: 100 } }
+        - { in: query, name: fetch, schema: { type: string, enum: [all] } }
+        - { in: query, name: search, schema: { type: string } }
+        - { in: query, name: sort, schema: { type: string, example: "panfletagem,-total_alunos" } }
+        - { in: query, name: filter[cidade_id][], schema: { type: integer } }
+        - { in: query, name: filter[bairro_id][], schema: { type: integer } }
+        - { in: query, name: filter[tipo][], schema: { type: string } }
+        - { in: query, name: filter[status], schema: { type: string, enum: [pendente, feito, todos] } }
+        - { in: query, name: filter[periodos][], schema: { $ref: '#/components/schemas/Periodo' } }
+      responses:
+        '200':
+          description: Lista paginada de escolas
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/EnvelopeSuccessList'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SchoolSummary'
+        '422':
+          description: Parametros invalidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+        '500':
+          description: Erro interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+  /v1/escolas/{id}:
+    get:
+      tags: [Escolas]
+      summary: Detalhes completos de uma escola
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Escola encontrada
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/EnvelopeSuccessResource'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SchoolDetail'
+        '404':
+          description: Escola nao encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+        '500':
+          description: Erro interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+    patch:
+      tags: [Escolas]
+      summary: Atualiza campos editaveis da escola
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: integer } }
+        - in: header
+          name: If-Match
+          schema:
+            type: string
+          required: true
+          description: valor atual de "versao_row"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [versao_row]
+              properties:
+                versao_row: { type: integer }
+                panfletagem: { type: boolean }
+                obs: { type: string }
+                periodos:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Periodo'
+                indicadores:
+                  $ref: '#/components/schemas/Indicadores'
+                total_alunos:
+                  type: integer
+                diretor:
+                  type: string
+                endereco:
+                  type: string
+      responses:
+        '200':
+          description: Escola atualizada
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/EnvelopeSuccessResource'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SchoolDetail'
+        '409':
+          description: Conflito de versao (If-Match)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+        '422':
+          description: Payload invalido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+        '500':
+          description: Erro interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+  /v1/cidades/{cidadeId}/bairros:
+    get:
+      tags: [Escolas]
+      summary: Lista bairros da cidade com agregados
+      parameters:
+        - in: path
+          name: cidadeId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: withEscolas
+          schema:
+            type: boolean
+          description: inclui resumos de escolas no payload de bairros
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: filter[tipo][]
+          schema:
+            type: string
+        - in: query
+          name: filter[status]
+          schema:
+            type: string
+            enum: [pendente, feito, todos]
+        - in: query
+          name: filter[periodos][]
+          schema:
+            $ref: '#/components/schemas/Periodo'
+      responses:
+        '200':
+          description: Agregados do municipio e bairros
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/EnvelopeSuccessList'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/NeighborhoodAggregate'
+        '422':
+          description: Parametros invalidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
+        '500':
+          description: Erro interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeError'
