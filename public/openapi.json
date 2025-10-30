@@ -962,6 +962,115 @@
                 }
             }
         },
+        "/v1/leads/overview": {
+            "get": {
+                "tags": [
+                    "Leads"
+                ],
+                "summary": "Resumo dos leads por campanha",
+                "operationId": "dc296e47fa6e759bdb94906514743f99",
+                "parameters": [
+                    {
+                        "name": "campaign_id",
+                        "in": "query",
+                        "description": "Um ou mais IDs de campanha (separados por virgula).",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "416,415"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "description": "Quantidade de leads recentes a retornar (padrao 10, maximo 100).",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 10,
+                            "maximum": 100,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "date_from",
+                        "in": "query",
+                        "description": "Filtro de data inicial (lead.created_at) em ISO-8601.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        }
+                    },
+                    {
+                        "name": "date_to",
+                        "in": "query",
+                        "description": "Filtro de data final (lead.created_at) em ISO-8601.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        }
+                    },
+                    {
+                        "name": "dedupe_by",
+                        "in": "query",
+                        "description": "Chave usada para desduplicar leads (lead_id ou whatsapp).",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "lead_id",
+                            "enum": [
+                                "lead_id",
+                                "whatsapp"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Resumo de leads gerado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GenericResourceResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parametros invalidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Erro ao consultar o CRM",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/v1/orders/{uuid}": {
             "get": {
                 "tags": [
@@ -1265,6 +1374,631 @@
                 }
             }
         },
+        "/v1/passwords/bulk": {
+            "post": {
+                "tags": [
+                    "Passwords"
+                ],
+                "summary": "Executa acoes em massa sobre senhas",
+                "operationId": "e08cdd2a9e428b21df86822dfafd799e",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PasswordBulkPayload"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Resultado da acao em massa",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PasswordBulkResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parametros invalidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro ao processar a acao",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/passwords/check": {
+            "get": {
+                "tags": [
+                    "Passwords"
+                ],
+                "summary": "Verifica se existe senha cadastrada para o par local/usuario",
+                "operationId": "28988bd8e31c283c14454d0e97960c63",
+                "parameters": [
+                    {
+                        "name": "local",
+                        "in": "query",
+                        "description": "Plataforma ou sistema",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "usuario",
+                        "in": "query",
+                        "description": "Usuario ou email",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Resultado da verificacao",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PasswordCheckResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parametros invalidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/passwords": {
+            "get": {
+                "tags": [
+                    "Passwords"
+                ],
+                "summary": "Lista senhas com filtros e paginacao",
+                "operationId": "a4790b3158935b0adaa437becfa4a691",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Pagina atual",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Itens por pagina (1-200)",
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 200,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "fetch",
+                        "in": "query",
+                        "description": "Use 'all' para retornar todos os resultados",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "all"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "description": "Busca livre em usuário, local, link e descrição",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "sort",
+                        "in": "query",
+                        "description": "Ordenação ex.: usuario,-updated_at",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "filter[tipo]",
+                        "in": "query",
+                        "description": "Filtra por tipo de credencial",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "Sistema",
+                                "Rede Social",
+                                "E-mail"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "filter[local]",
+                        "in": "query",
+                        "description": "Filtra por plataforma/serviço",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "filter[verificado]",
+                        "in": "query",
+                        "description": "1 para verificados, 0 para não verificados",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "name": "filter[created_at][gte]",
+                        "in": "query",
+                        "description": "Data de criação >= (YYYY-MM-DD)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "filter[created_at][lte]",
+                        "in": "query",
+                        "description": "Data de criação <= (YYYY-MM-DD)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Lista paginada de senhas",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PasswordListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parametros invalidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Passwords"
+                ],
+                "summary": "Cria uma nova senha",
+                "operationId": "0eab5c6c7e8a4cdd3cc13b349d52618b",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PasswordCreatePayload"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Senha criada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PasswordResourceResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Dados invalidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro ao criar a senha",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/passwords/{id}": {
+            "get": {
+                "tags": [
+                    "Passwords"
+                ],
+                "summary": "Consulta detalhes completos de uma senha",
+                "operationId": "1f00f8c0c406d4e6ec44aba8577bb34c",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Identificador da senha (UUID)",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Senha encontrada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PasswordResourceResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Senha nao encontrada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "Passwords"
+                ],
+                "summary": "Remove uma senha (soft delete)",
+                "operationId": "7837048cf61507885f7b2b5cb15c95d2",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Identificador da senha",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Senha removida"
+                    },
+                    "404": {
+                        "description": "Senha nao encontrada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parametros invalidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro ao excluir",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "tags": [
+                    "Passwords"
+                ],
+                "summary": "Atualiza informacoes de uma senha",
+                "operationId": "380279d07d1652fed3feef078da050e4",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Identificador da senha",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PasswordUpdatePayload"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Senha atualizada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PasswordResourceResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Senha nao encontrada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Dados invalidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro ao atualizar",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/passwords/export": {
+            "get": {
+                "tags": [
+                    "Passwords"
+                ],
+                "summary": "Exporta senhas em JSON, CSV ou XLSX",
+                "operationId": "3af4e04fd582a16d4c7e1593cb28798b",
+                "parameters": [
+                    {
+                        "name": "format",
+                        "in": "query",
+                        "description": "Formato desejado (json, csv, xlsx)",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "json",
+                                "csv",
+                                "xlsx"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Arquivo gerado"
+                    },
+                    "422": {
+                        "description": "Parametros invalidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/passwords/platforms": {
+            "get": {
+                "tags": [
+                    "Passwords"
+                ],
+                "summary": "Lista plataformas mais utilizadas nas senhas",
+                "operationId": "4a9555829889ba89f9d5b93a910fbd20",
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "description": "Limite maximo de plataformas",
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 200,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "min_count",
+                        "in": "query",
+                        "description": "Quantidade minima para aparecer na lista",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Lista de plataformas",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PasswordPlatformsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parametros invalidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/passwords/stats": {
+            "get": {
+                "tags": [
+                    "Passwords"
+                ],
+                "summary": "Retorna estatisticas agregadas das senhas",
+                "operationId": "b97181b2d10316aba5e648f2d1409110",
+                "responses": {
+                    "200": {
+                        "description": "Dados agregados",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PasswordStatsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parametros invalidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/v1/reports/{key}/export": {
             "post": {
                 "tags": [
@@ -1481,6 +2215,189 @@
                     },
                     "502": {
                         "description": "Erro no CRM ou fonte externa",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/scheduled-posts/bulk": {
+            "delete": {
+                "tags": [
+                    "ScheduledPosts"
+                ],
+                "summary": "Remove múltiplos agendamentos",
+                "operationId": "4e91c92a927b22d9e3a49231fc423cc9",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "ids": {
+                                        "description": "Identificadores a serem removidos",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer",
+                                            "minimum": 1
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Resultados da remoção",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parâmetros inválidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "tags": [
+                    "ScheduledPosts"
+                ],
+                "summary": "Atualiza múltiplos agendamentos de uma única vez",
+                "operationId": "f9b8c3c0364a43378fbb2d7ffc595f6b",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "ids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer",
+                                            "minimum": 1
+                                        }
+                                    },
+                                    "updates": {
+                                        "description": "Campos a atualizar (ex.: scheduled_datetime, caption)",
+                                        "type": "object"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Atualização em lote concluída",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parâmetros inválidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/scheduled-posts/bulk/dispatch": {
+            "post": {
+                "tags": [
+                    "ScheduledPosts"
+                ],
+                "summary": "Força o disparo de posts específicos",
+                "operationId": "bf88299b2cb9d0b3ea8313eac1d8a817",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "ids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer",
+                                            "minimum": 1
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Resultado do disparo em lote",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parâmetros inválidos",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1976,6 +2893,186 @@
                 }
             }
         },
+        "/v1/scheduled-posts/worker/dispatch": {
+            "post": {
+                "tags": [
+                    "ScheduledPosts"
+                ],
+                "summary": "Processa agendamentos pendentes e publica no status",
+                "operationId": "d341afa3332e59e1cd14e6f67d59c90f",
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "limit": {
+                                        "description": "Quantidade máxima de posts processados na execução.",
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "example": 20
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Execução concluída",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "summary": {
+                                            "properties": {
+                                                "limit": {
+                                                    "type": "integer"
+                                                },
+                                                "processed": {
+                                                    "type": "integer"
+                                                },
+                                                "sent": {
+                                                    "type": "integer"
+                                                },
+                                                "failed": {
+                                                    "type": "integer"
+                                                },
+                                                "skipped": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "items": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "type": {
+                                                        "type": "string"
+                                                    },
+                                                    "scheduled_datetime": {
+                                                        "type": "string"
+                                                    },
+                                                    "status": {
+                                                        "type": "string"
+                                                    },
+                                                    "messageId": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "zaapId": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "provider_status": {
+                                                        "type": "integer",
+                                                        "nullable": true
+                                                    },
+                                                    "error": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/scheduled-posts/{id}/duplicate": {
+            "post": {
+                "tags": [
+                    "ScheduledPosts"
+                ],
+                "summary": "Duplica um agendamento",
+                "operationId": "a3c2de33c8b7d186ddbe7bad62bbd25a",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "description": "Campos que podem ser sobrescritos no novo agendamento",
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Novo agendamento criado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Agendamento original não encontrado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parâmetros inválidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/v1/scheduled-posts/ready": {
             "get": {
                 "tags": [
@@ -2011,6 +3108,139 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ScheduledPostListResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/scheduled-posts/analytics": {
+            "get": {
+                "tags": [
+                    "ScheduledPosts"
+                ],
+                "summary": "Retorna métricas e KPIs dos agendamentos",
+                "operationId": "59d03fb115038d22ceb54ac8914e4ce1",
+                "parameters": [
+                    {
+                        "name": "filter[type]",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "text",
+                                "image",
+                                "video"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "filter[status]",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "pending",
+                                "scheduled",
+                                "sent",
+                                "failed"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "filter[scheduled_datetime][gte]",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        }
+                    },
+                    {
+                        "name": "filter[scheduled_datetime][lte]",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        }
+                    },
+                    {
+                        "name": "filter[created_at][gte]",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        }
+                    },
+                    {
+                        "name": "filter[created_at][lte]",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Indicadores consolidados",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "summary": {
+                                            "type": "object"
+                                        },
+                                        "success_rate": {
+                                            "type": "number",
+                                            "format": "float"
+                                        },
+                                        "by_type": {
+                                            "type": "object"
+                                        },
+                                        "by_date": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        },
+                                        "recent_activity": {
+                                            "type": "object"
+                                        },
+                                        "upcoming": {
+                                            "type": "object"
+                                        },
+                                        "performance": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Parâmetros inválidos",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorEnvelope"
                                 }
                             }
                         }
@@ -5033,6 +6263,501 @@
                         "type": "object"
                     }
                 ]
+            },
+            "PasswordResource": {
+                "required": [
+                    "id",
+                    "usuario",
+                    "senha",
+                    "link",
+                    "tipo",
+                    "local",
+                    "verificado",
+                    "ativo",
+                    "created_at",
+                    "updated_at"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "example": "550e8400-e29b-41d4-a716-446655440000"
+                    },
+                    "usuario": {
+                        "type": "string",
+                        "example": "admin@empresa.com"
+                    },
+                    "senha": {
+                        "description": "Senha criptografada ou texto puro, dependendo do endpoint.",
+                        "type": "string",
+                        "example": "a1b2c3:ff0011:9933aa"
+                    },
+                    "link": {
+                        "type": "string",
+                        "format": "uri",
+                        "example": "https://exemplo.com/admin"
+                    },
+                    "tipo": {
+                        "type": "string",
+                        "enum": [
+                            "Sistema",
+                            "Rede Social",
+                            "E-mail"
+                        ],
+                        "example": "Sistema"
+                    },
+                    "local": {
+                        "type": "string",
+                        "example": "WordPress"
+                    },
+                    "verificado": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "ativo": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "descricao": {
+                        "type": "string",
+                        "example": "Painel administrativo",
+                        "nullable": true
+                    },
+                    "ip": {
+                        "type": "string",
+                        "example": "192.168.1.100",
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2024-01-15T10:00:00Z"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2024-01-20T14:30:00Z"
+                    },
+                    "created_by": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    },
+                    "updated_by": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "PasswordCreatePayload": {
+                "required": [
+                    "usuario",
+                    "senha",
+                    "link",
+                    "tipo",
+                    "local"
+                ],
+                "properties": {
+                    "usuario": {
+                        "type": "string",
+                        "maxLength": 255,
+                        "minLength": 3,
+                        "example": "admin@empresa.com"
+                    },
+                    "senha": {
+                        "type": "string",
+                        "maxLength": 255,
+                        "minLength": 6,
+                        "example": "SenhaForte@2024"
+                    },
+                    "link": {
+                        "type": "string",
+                        "example": "https://exemplo.com/admin"
+                    },
+                    "tipo": {
+                        "type": "string",
+                        "enum": [
+                            "Sistema",
+                            "Rede Social",
+                            "E-mail"
+                        ],
+                        "example": "Sistema"
+                    },
+                    "local": {
+                        "type": "string",
+                        "example": "WordPress"
+                    },
+                    "verificado": {
+                        "type": "boolean",
+                        "example": false,
+                        "nullable": true
+                    },
+                    "descricao": {
+                        "type": "string",
+                        "maxLength": 500,
+                        "nullable": true
+                    },
+                    "ip": {
+                        "type": "string",
+                        "example": "192.168.1.100",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "PasswordUpdatePayload": {
+                "properties": {
+                    "usuario": {
+                        "type": "string",
+                        "maxLength": 255,
+                        "minLength": 3
+                    },
+                    "senha": {
+                        "type": "string",
+                        "maxLength": 255,
+                        "minLength": 6
+                    },
+                    "link": {
+                        "type": "string"
+                    },
+                    "tipo": {
+                        "type": "string",
+                        "enum": [
+                            "Sistema",
+                            "Rede Social",
+                            "E-mail"
+                        ]
+                    },
+                    "local": {
+                        "type": "string",
+                        "maxLength": 100,
+                        "minLength": 2
+                    },
+                    "verificado": {
+                        "type": "boolean"
+                    },
+                    "descricao": {
+                        "type": "string",
+                        "maxLength": 500,
+                        "nullable": true
+                    },
+                    "ip": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "PasswordBulkPayload": {
+                "required": [
+                    "action",
+                    "ids"
+                ],
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "enum": [
+                            "verify",
+                            "unverify",
+                            "delete"
+                        ],
+                        "example": "verify"
+                    },
+                    "ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "minItems": 1
+                    }
+                },
+                "type": "object"
+            },
+            "PasswordBulkResultItem": {
+                "required": [
+                    "id",
+                    "success"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "success": {
+                        "type": "boolean"
+                    },
+                    "error": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "PasswordBulkResponse": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/SuccessEnvelope"
+                    },
+                    {
+                        "properties": {
+                            "data": {
+                                "required": [
+                                    "action",
+                                    "affected_rows",
+                                    "processed",
+                                    "failed",
+                                    "results"
+                                ],
+                                "properties": {
+                                    "action": {
+                                        "type": "string",
+                                        "example": "verify"
+                                    },
+                                    "affected_rows": {
+                                        "type": "integer",
+                                        "example": 3
+                                    },
+                                    "processed": {
+                                        "type": "integer",
+                                        "example": 3
+                                    },
+                                    "failed": {
+                                        "type": "integer",
+                                        "example": 0
+                                    },
+                                    "results": {
+                                        "type": "array",
+                                        "items": {
+                                            "$ref": "#/components/schemas/PasswordBulkResultItem"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        },
+                        "type": "object"
+                    }
+                ]
+            },
+            "PasswordStatsResource": {
+                "required": [
+                    "total",
+                    "verificados",
+                    "nao_verificados",
+                    "por_tipo",
+                    "por_plataforma",
+                    "ultimas_atualizacoes",
+                    "criadas_hoje",
+                    "atualizadas_hoje"
+                ],
+                "properties": {
+                    "total": {
+                        "type": "integer",
+                        "example": 150
+                    },
+                    "verificados": {
+                        "type": "integer",
+                        "example": 120
+                    },
+                    "nao_verificados": {
+                        "type": "integer",
+                        "example": 30
+                    },
+                    "por_tipo": {
+                        "type": "object",
+                        "example": {
+                            "Sistema": 60,
+                            "Rede Social": 55,
+                            "E-mail": 35
+                        },
+                        "additionalProperties": {
+                            "schema": "CommonSchemas",
+                            "type": "integer"
+                        }
+                    },
+                    "por_plataforma": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "schema": "CommonSchemas",
+                            "type": "integer"
+                        }
+                    },
+                    "ultimas_atualizacoes": {
+                        "type": "array",
+                        "items": {
+                            "required": [
+                                "id",
+                                "usuario",
+                                "local",
+                                "updated_at"
+                            ],
+                            "properties": {
+                                "id": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                },
+                                "usuario": {
+                                    "type": "string"
+                                },
+                                "local": {
+                                    "type": "string"
+                                },
+                                "updated_at": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    },
+                    "criadas_hoje": {
+                        "type": "integer",
+                        "example": 5
+                    },
+                    "atualizadas_hoje": {
+                        "type": "integer",
+                        "example": 12
+                    }
+                },
+                "type": "object"
+            },
+            "CommonSchemas": {
+                "type": "integer"
+            },
+            "PasswordStatsResponse": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/SuccessEnvelope"
+                    },
+                    {
+                        "properties": {
+                            "data": {
+                                "$ref": "#/components/schemas/PasswordStatsResource"
+                            }
+                        },
+                        "type": "object"
+                    }
+                ]
+            },
+            "PasswordPlatformResource": {
+                "required": [
+                    "local",
+                    "count"
+                ],
+                "properties": {
+                    "local": {
+                        "type": "string",
+                        "example": "WordPress"
+                    },
+                    "count": {
+                        "type": "integer",
+                        "example": 25
+                    }
+                },
+                "type": "object"
+            },
+            "PasswordPlatformsResponse": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/SuccessEnvelope"
+                    },
+                    {
+                        "properties": {
+                            "data": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/PasswordPlatformResource"
+                                }
+                            }
+                        },
+                        "type": "object"
+                    }
+                ]
+            },
+            "PasswordCheckResponse": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/SuccessEnvelope"
+                    },
+                    {
+                        "properties": {
+                            "data": {
+                                "required": [
+                                    "exists",
+                                    "password"
+                                ],
+                                "properties": {
+                                    "exists": {
+                                        "type": "boolean"
+                                    },
+                                    "password": {
+                                        "required": [
+                                            "id",
+                                            "usuario",
+                                            "local",
+                                            "verificado"
+                                        ],
+                                        "properties": {
+                                            "id": {
+                                                "type": "string",
+                                                "format": "uuid"
+                                            },
+                                            "usuario": {
+                                                "type": "string"
+                                            },
+                                            "local": {
+                                                "type": "string"
+                                            },
+                                            "verificado": {
+                                                "type": "boolean"
+                                            }
+                                        },
+                                        "type": "object",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        },
+                        "type": "object"
+                    }
+                ]
+            },
+            "PasswordResourceResponse": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/SuccessEnvelope"
+                    },
+                    {
+                        "properties": {
+                            "data": {
+                                "$ref": "#/components/schemas/PasswordResource"
+                            }
+                        },
+                        "type": "object"
+                    }
+                ]
+            },
+            "PasswordListResponse": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/SuccessEnvelope"
+                    },
+                    {
+                        "properties": {
+                            "data": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/PasswordResource"
+                                }
+                            }
+                        },
+                        "type": "object"
+                    }
+                ]
             }
         },
         "responses": {
@@ -5271,6 +6996,14 @@
         {
             "name": "Campaigns",
             "description": "Campaign scheduling and orchestration"
+        },
+        {
+            "name": "Passwords",
+            "description": "Gestao de senhas e credenciais empresariais"
+        },
+        {
+            "name": "Leads",
+            "description": "Leads"
         }
     ],
     "externalDocs": {
