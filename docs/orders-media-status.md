@@ -12,15 +12,15 @@ GET https://api.evydencia.com.br/v1/orders/media-status
 
 > Para ambientes locais de desenvolvimento a rota permanece acessível via `http://localhost/v1/orders/media-status`.
 
-### Parametros de query
+### Intervalo fixo
 
-| Parametro | Tipo | Obrigatorio | Padrao | Descricao |
-|-----------|------|-------------|--------|-----------|
-| `session_start` | string (YYYY-MM-DD) | nao | `2025-09-01` | Data inicial das sessoes. Valores anteriores a 01/09/2025 sao rejeitados. |
-| `session_end` | string (YYYY-MM-DD) | nao | ontem | Data final das sessoes. Deve ser menor ou igual a ontem. |
-| `product_slug` | string | nao | `natal` | Slug do produto. Use `*` para remover o filtro (retorna todos os produtos). |
+Nao e necessario (nem suportado) enviar parametros de query. A API utiliza sempre:
 
-Se `product_slug` for omitido ou vazio, o back-end utiliza automaticamente o slug `natal`. O valor `*` desativa o filtro e replica as buscas do Postman (todos os produtos no intervalo informado). Valores sao normalizados para minusculo.
+- `session_start = 2025-09-01`  
+- `session_end = <data de hoje>` (UTC)  
+- `product_slug = natal`
+
+Qualquer parametro adicional enviado sera ignorado.
 
 ---
 
@@ -42,13 +42,12 @@ O `Authorization` utiliza o token da Evydencia (mesmo header exigido pelo endpoi
 
 ```bash
 curl --location --globoff \
-  'https://api.evydencia.com.br/v1/orders/media-status?session_start=2025-09-01&session_end=2025-10-29&product_slug=natal' \
+  'https://api.evydencia.com.br/v1/orders/media-status' \
   --header 'Accept: application/json' \
   --header 'Authorization: CjxrF/MigNTVg/VUjTdBkY160yHYTC+L0mNFXUWr0yg='
 ```
 
-* Ajuste `session_end` para a data de ontem (a API bloqueia datas futuras).
-* Para remover o filtro por produto, utilize `product_slug=*`.
+* O intervalo e o slug sao aplicados automaticamente (01/09/2025 ate a data atual, produto `natal`).
 * O `Trace-Id` sera retornado nos headers de resposta (Trace-Id e X-Request-Id) para correlacao de logs.
 
 ---
@@ -72,7 +71,7 @@ curl --location --globoff \
    * Guarde `id`, `schedule_1`, `status.name`, `items[].product.name` (primeiro bundle ou item).
 
 2. **Cruzar com midia**
-   * Chame `https://api.evydencia.com.br/v1/orders/media-status` utilizando o mesmo intervalo (`session_start`, `session_end`) e, quando necessario, informe `product_slug`.
+   * Chame `https://api.evydencia.com.br/v1/orders/media-status` (sem parametros). A API aplica automaticamente `session_start=2025-09-01`, `session_end=<data atual>` e `product_slug=natal`.
    * O back-end consulta o CRM externo da Evydencia, aplica paginação automatica (`per_page = 200`, limite de 50 paginas), ignora cancelados, e verifica se o `id` do pedido existe como pasta nos status das plataformas de galeria e game.
 
 3. **Montar a interface**
@@ -136,7 +135,7 @@ curl --location --globoff \
       "session_end": "2025-10-31",
       "product_slug": "natal",
       "default_product_slug": "natal",
-      "requested_product_slug": null
+      "requested_product_slug": "natal"
     },
     "page": 1,
     "per_page": 2,
@@ -191,9 +190,9 @@ Cada objeto possui:
 
 ### `meta.filters`
 
-* `product_slug`: slug normalizado efetivamente usado na consulta (`null` quando nao houve filtro).  
-* `default_product_slug`: valor padrao que a API utilizara caso nenhum slug seja informado.  
-* `requested_product_slug`: valor recebido na query string, apos `trim` (pode ser `null` ou `*`).  
+* `product_slug`: slug normalizado efetivamente usado na consulta (fixo `natal`).  
+* `default_product_slug`: valor padrao aplicado internamente (`natal`).  
+* `requested_product_slug`: slug efetivamente solicitado (sempre `natal`, pois nao ha parametros externos).  
 * `session_start`, `session_end`: parametros utilizados na execucao.
 
 ---
@@ -220,7 +219,7 @@ Cada objeto possui:
 
 1. Chamar `/v1/orders/search` com `order[session-start]`, `order[session-end]` e `product[slug]` (natal ou outro slug desejado).  
 2. Remover cancelados (`status.id = 1` ou `status.name = "Pedido Cancelado"`).  
-3. Chamar `https://api.evydencia.com.br/v1/orders/media-status` com os mesmos filtros.  
+3. Chamar `https://api.evydencia.com.br/v1/orders/media-status` (sem parametros; o intervalo e o slug ja estao chumbados).  
 4. Mesclar as informacoes de ambos os retornos (campos ricos do CRM + flags de midia).  
 5. Exibir os KPIs (`summary.kpis`) e contadores (`summary.orders`) no topo do dashboard.  
 6. Para detalhamento, utilizar `media_status.gallery.pastas[]` e `media_status.game.pastas[]`, que trazem a lista de arquivos exatamente como no status.php original.

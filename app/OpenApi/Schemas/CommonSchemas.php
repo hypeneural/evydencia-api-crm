@@ -15,7 +15,17 @@ use OpenApi\Annotations as OA;
  *     @OA\Property(property="count", type="integer", example=50, nullable=true),
  *     @OA\Property(property="total_pages", type="integer", example=3, nullable=true),
  *     @OA\Property(property="source", type="string", example="api"),
- *     @OA\Property(property="elapsed_ms", type="integer", example=42, nullable=true)
+ *     @OA\Property(property="elapsed_ms", type="integer", example=42, nullable=true),
+ *     @OA\Property(
+ *         property="filters",
+ *         type="object",
+ *         nullable=true,
+ *         @OA\Property(property="session_start", type="string", example="2025-09-01"),
+ *         @OA\Property(property="session_end", type="string", example="2025-10-31"),
+ *         @OA\Property(property="product_slug", type="string", example="natal"),
+ *         @OA\Property(property="default_product_slug", type="string", example="natal"),
+ *         @OA\Property(property="requested_product_slug", type="string", example="natal", nullable=true)
+ *     )
  * )
  *
  * @OA\Schema(
@@ -621,12 +631,28 @@ use OpenApi\Annotations as OA;
  *         @OA\Items(type="string", example="2025-09-01")
  *     ),
  *     @OA\Property(
+ *         property="filters",
+ *         type="object",
+ *         required={"product_slug","default_product_slug"},
+ *         @OA\Property(property="product_slug", type="string", example="natal"),
+ *         @OA\Property(property="default_product_slug", type="string", example="natal"),
+ *         @OA\Property(property="requested_product_slug", type="string", example="natal", nullable=true)
+ *     ),
+ *     @OA\Property(
  *         property="sources",
  *         type="object",
  *         required={"orders","game_status","gallery_status"},
  *         @OA\Property(property="orders", type="string", format="uri", example="https://evydencia.com/api/orders/search"),
  *         @OA\Property(property="game_status", type="string", format="uri", example="https://game.fotosdenatal.com/status.php"),
  *         @OA\Property(property="gallery_status", type="string", format="uri", example="https://galeria.fotosdenatal.com/status.php")
+ *     ),
+ *     @OA\Property(
+ *         property="kpis",
+ *         type="object",
+ *         @OA\Property(property="total_imagens", type="integer", example=231),
+ *         @OA\Property(property="media_fotos", type="number", format="float", nullable=true, example=23.1),
+ *         @OA\Property(property="total_galerias_ativas", type="integer", example=10),
+ *         @OA\Property(property="total_jogos_ativos", type="integer", example=9)
  *     ),
  *     @OA\Property(
  *         property="orders",

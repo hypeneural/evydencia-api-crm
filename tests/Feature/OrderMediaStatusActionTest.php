@@ -46,8 +46,6 @@ final class OrderMediaStatusActionTest extends TestCase
 
     public function testReturnsMediaStatusPayload(): void
     {
-        $sessionStart = GetOrderMediaStatusAction::DEFAULT_SESSION_START;
-        $sessionEnd = '2025-09-15';
         $action = $this->createAction(
             [
                 $this->crmResponse([
@@ -97,12 +95,11 @@ final class OrderMediaStatusActionTest extends TestCase
             ]
         );
 
+        $today = (new \DateTimeImmutable('today'))->format('Y-m-d');
+        $sessionStart = GetOrderMediaStatusAction::DEFAULT_SESSION_START;
+
         $request = (new ServerRequestFactory())
             ->createServerRequest('GET', '/v1/orders/media-status')
-            ->withQueryParams([
-                'session_start' => $sessionStart,
-                'session_end' => $sessionEnd,
-            ])
             ->withAttribute('trace_id', 'trace-1');
         $response = (new ResponseFactory())->createResponse();
 
@@ -126,62 +123,10 @@ final class OrderMediaStatusActionTest extends TestCase
         self::assertTrue($payload['data'][0]['in_gallery']);
         self::assertSame('natal', $payload['meta']['filters']['product_slug']);
         self::assertSame('natal', $payload['meta']['filters']['default_product_slug']);
-        self::assertNull($payload['meta']['filters']['requested_product_slug']);
+        self::assertSame('natal', $payload['meta']['filters']['requested_product_slug']);
+        self::assertSame($sessionStart, $payload['meta']['filters']['session_start']);
+        self::assertSame($today, $payload['meta']['filters']['session_end']);
         self::assertSame('trace-1', $payload['trace_id']);
-    }
-
-    public function testValidatesInvalidDatePayload(): void
-    {
-        $action = $this->createAction([], []);
-
-        $request = (new ServerRequestFactory())
-            ->createServerRequest('GET', '/v1/orders/media-status')
-            ->withQueryParams([
-                'session_start' => '2025-13-01',
-                'session_end' => '2025-02-30',
-            ])
-            ->withAttribute('trace_id', 'trace-2');
-        $response = (new ResponseFactory())->createResponse();
-
-        $result = $action->__invoke($request, $response);
-        self::assertSame(422, $result->getStatusCode());
-    }
-
-    public function testAllowsProductSlugOverrideInQuery(): void
-    {
-        $sessionStart = GetOrderMediaStatusAction::DEFAULT_SESSION_START;
-        $sessionEnd = '2025-09-15';
-        $action = $this->createAction(
-            [
-                $this->crmResponse([
-                    'data' => [],
-                    'meta' => ['current_page' => 1, 'last_page' => 1],
-                ]),
-            ],
-            [
-                $this->mediaResponse(['pastas' => []]),
-                $this->mediaResponse(['pastas' => []]),
-            ]
-        );
-
-        $request = (new ServerRequestFactory())
-            ->createServerRequest('GET', '/v1/orders/media-status')
-            ->withQueryParams([
-                'session_start' => $sessionStart,
-                'session_end' => $sessionEnd,
-                'product_slug' => '*',
-            ])
-            ->withAttribute('trace_id', 'trace-override');
-        $response = (new ResponseFactory())->createResponse();
-
-        $result = $action->__invoke($request, $response);
-        $payload = json_decode((string) $result->getBody(), true, 512, JSON_THROW_ON_ERROR);
-
-        self::assertSame(200, $result->getStatusCode(), 'Payload: ' . json_encode($payload));
-        self::assertNull($payload['summary']['filters']['product_slug']);
-        self::assertSame('natal', $payload['summary']['filters']['default_product_slug']);
-        self::assertNull($payload['meta']['filters']['product_slug']);
-        self::assertSame('*', $payload['meta']['filters']['requested_product_slug']);
     }
 
     /**

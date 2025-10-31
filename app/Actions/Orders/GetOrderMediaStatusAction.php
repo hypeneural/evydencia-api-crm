@@ -34,28 +34,7 @@ final class GetOrderMediaStatusAction
      *     path="/v1/orders/media-status",
      *     tags={"Orders"},
      *     summary="Lista pedidos de Natal com status de midia",
-     *     description="Consulta pedidos da campanha Natal no CRM e verifica se existem pastas nas instancias da galeria e do game.",
-     *     @OA\Parameter(
-     *         name="session_start",
-     *         in="query",
-     *         required=false,
-     *         description="Data inicial da sessao (YYYY-MM-DD). Default: 2025-09-01.",
-     *         @OA\Schema(type="string", pattern="^\d{4}-\d{2}-\d{2}$")
-     *     ),
-     *     @OA\Parameter(
-     *         name="session_end",
-     *         in="query",
-     *         required=false,
-     *         description="Data final da sessao (YYYY-MM-DD). Default: ontem.",
-     *         @OA\Schema(type="string", pattern="^\d{4}-\d{2}-\d{2}$")
-     *     ),
-     *     @OA\Parameter(
-     *         name="product_slug",
-     *         in="query",
-     *         required=false,
-     *         description="Slug do produto a ser filtrado. Default: natal. Use * para retornar todos.",
-     *         @OA\Schema(type="string")
-     *     ),
+     *     description="Consulta pedidos da campanha Natal no CRM, usando o intervalo pre-configurado (2025-09-01 ate a data atual) e verifica se existem pastas nas instancias da galeria e do game.",
      *     @OA\Response(
      *         response=200,
      *         description="Pedidos com status de midia",
@@ -71,15 +50,9 @@ final class GetOrderMediaStatusAction
         $traceId = $this->resolveTraceId($request);
         $startedAt = microtime(true);
 
-        $params = $request->getQueryParams();
-        [$sessionStart, $sessionEnd, $errors] = $this->resolveDateRange($params);
-        $productSlug = $this->resolveProductSlug($params);
-
-        if ($errors !== []) {
-            return $this->responder
-                ->validationError($response, $traceId, $errors)
-                ->withHeader('X-Request-Id', $traceId);
-        }
+        $sessionStart = self::DEFAULT_SESSION_START;
+        $sessionEnd = (new \DateTimeImmutable('today'))->format('Y-m-d');
+        $productSlug = OrderMediaStatusService::TARGET_PRODUCT_SLUG;
 
         try {
             $result = $this->service->getMediaStatus($sessionStart, $sessionEnd, $traceId, $productSlug);
@@ -128,13 +101,13 @@ final class GetOrderMediaStatusAction
                 'total' => $count,
                 'elapsed_ms' => $elapsedMs,
                 'filters' => [
-                    'session_start' => $sessionStart,
-                    'session_end' => $sessionEnd,
-                    'product_slug' => $summaryProductSlug,
-                    'default_product_slug' => $defaultProductSlug,
-                    'requested_product_slug' => $productSlug,
-                ],
+                'session_start' => $sessionStart,
+                'session_end' => $sessionEnd,
+                'product_slug' => $summaryProductSlug,
+                'default_product_slug' => $defaultProductSlug,
+                'requested_product_slug' => $productSlug,
             ],
+        ],
             'links' => [
                 'self' => (string) $request->getUri(),
             ],
@@ -151,81 +124,5 @@ final class GetOrderMediaStatusAction
             ->withHeader('Cache-Control', 'no-store');
     }
 
-    /**
-     * @param array<string, mixed> $params
-     * @return array{0:string,1:string,2:array<int, array{field:string, message:string}>}
-     */
-    private function resolveDateRange(array $params): array
-    {
-        $errors = [];
-        $sessionStart = isset($params['session_start']) && is_string($params['session_start'])
-            ? trim($params['session_start'])
-            : self::DEFAULT_SESSION_START;
-        $sessionEnd = isset($params['session_end']) && is_string($params['session_end'])
-            ? trim($params['session_end'])
-            : (new \DateTimeImmutable('yesterday'))->format('Y-m-d');
-
-        if (!$this->isValidIsoDate($sessionStart)) {
-            $errors[] = ['field' => 'session_start', 'message' => 'Utilize o formato YYYY-MM-DD.'];
-        }
-
-        if (!$this->isValidIsoDate($sessionEnd)) {
-            $errors[] = ['field' => 'session_end', 'message' => 'Utilize o formato YYYY-MM-DD.'];
-        }
-
-        if ($errors !== []) {
-            return [$sessionStart, $sessionEnd, $errors];
-        }
-
-        $startDate = \DateTimeImmutable::createFromFormat('Y-m-d', $sessionStart);
-        $endDate = \DateTimeImmutable::createFromFormat('Y-m-d', $sessionEnd);
-        if ($startDate === false || $endDate === false) {
-            $errors[] = ['field' => 'session_start', 'message' => 'Datas invalidas.'];
-
-            return [$sessionStart, $sessionEnd, $errors];
-        }
-
-        if ($startDate > $endDate) {
-            $errors[] = ['field' => 'session_start', 'message' => 'A data inicial nao pode ser posterior a data final.'];
-        }
-
-        $minimum = \DateTimeImmutable::createFromFormat('Y-m-d', self::DEFAULT_SESSION_START);
-        if ($minimum !== false && $startDate < $minimum) {
-            $errors[] = ['field' => 'session_start', 'message' => sprintf('Informe data igual ou posterior a %s.', self::DEFAULT_SESSION_START)];
-        }
-
-        $yesterday = new \DateTimeImmutable('yesterday');
-        if ($endDate > $yesterday) {
-            $errors[] = ['field' => 'session_end', 'message' => 'A data final deve ser no maximo ontem.'];
-        }
-
-        return [$sessionStart, $sessionEnd, $errors];
-    }
-
-    private function isValidIsoDate(string $value): bool
-    {
-        return (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $value);
-    }
-
-    /**
-     * @param array<string, mixed> $params
-     */
-    private function resolveProductSlug(array $params): ?string
-    {
-        $value = null;
-
-        if (isset($params['product_slug']) && is_string($params['product_slug'])) {
-            $value = $params['product_slug'];
-        } elseif (isset($params['product']) && is_array($params['product']) && isset($params['product']['slug']) && is_string($params['product']['slug'])) {
-            $value = $params['product']['slug'];
-        }
-
-        if ($value === null) {
-            return null;
-        }
-
-        $trimmed = trim($value);
-
-        return $trimmed === '' ? null : $trimmed;
-    }
+    // Parameters are fixed; no additional helpers required.
 }
