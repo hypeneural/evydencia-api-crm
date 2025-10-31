@@ -91,11 +91,16 @@ curl --location --globoff \
   "data": [
     {
       "id": 4490,
+      "uuid": "6cc28bfa-e8b7-4868-a7da-4743ab164482",
       "schedule_1": "2025-10-28 17:00:00",
       "status_name": "Aguardando Retirar",
       "product_name": "Experiencia Ho-Ho-Ho",
       "in_gallery": true,
-      "in_game": false
+      "in_game": false,
+      "customer": {
+        "name": "Mara Rubia Soares Gomes",
+        "whatsapp": "48996048606"
+      }
     }
   ],
   "summary": {
@@ -142,7 +147,7 @@ curl --location --globoff \
     "total": 2
   },
   "links": {
-    "self": "https://api.evydencia.com.br/v1/orders/media-status?session_start=2025-09-01&session_end=2025-10-31"
+    "self": "https://api.evydencia.com.br/v1/orders/media-status"
   },
   "trace_id": "...."
 }
@@ -159,11 +164,14 @@ curl --location --globoff \
 | Campo | Descricao |
 |-------|-----------|
 | `id` | ID do pedido no CRM. |
+| `uuid` | UUID do pedido no CRM. |
 | `schedule_1` | Data/hora da sessao. |
 | `status_name` | Nome do status atual do pedido. |
 | `product_name` | Primeiro pacote (`bundle=true`) ou, na falta, o primeiro item do pedido. |
 | `in_gallery` | `true` se existe pasta com o mesmo ID na galeria. |
 | `in_game` | `true` se existe pasta com o mesmo ID no game. |
+| `customer.name` | Nome do cliente informado pela Evydencia. |
+| `customer.whatsapp` | Telefone/WhatsApp do cliente (quando informado). |
 
 ### `summary.kpis`
 

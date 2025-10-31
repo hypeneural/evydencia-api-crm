@@ -52,10 +52,15 @@ final class OrderMediaStatusActionTest extends TestCase
                     'data' => [
                         [
                             'id' => 4490,
+                            'uuid' => '6cc28bfa-e8b7-4868-a7da-4743ab164482',
                             'schedule_1' => '2025-10-28 17:00:00',
                             'status' => ['id' => 2, 'name' => 'Aguardando Retirar'],
                             'items' => [
                                 ['product' => ['bundle' => true, 'name' => 'Experiencia Ho-Ho-Ho']],
+                            ],
+                            'customer' => [
+                                'name' => 'Mara Rubia Soares Gomes',
+                                'whatsapp' => '48996048606',
                             ],
                         ],
                     ],
@@ -121,6 +126,9 @@ final class OrderMediaStatusActionTest extends TestCase
         self::assertSame(['4490'], $payload['media_status']['gallery']['folder_ids']);
         self::assertSame(12, $payload['media_status']['gallery']['computed']['total_photos']);
         self::assertTrue($payload['data'][0]['in_gallery']);
+        self::assertSame('6cc28bfa-e8b7-4868-a7da-4743ab164482', $payload['data'][0]['uuid']);
+        self::assertSame('Mara Rubia Soares Gomes', $payload['data'][0]['customer']['name']);
+        self::assertSame('48996048606', $payload['data'][0]['customer']['whatsapp']);
         self::assertSame('natal', $payload['meta']['filters']['product_slug']);
         self::assertSame('natal', $payload['meta']['filters']['default_product_slug']);
         self::assertSame('natal', $payload['meta']['filters']['requested_product_slug']);

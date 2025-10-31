@@ -48,11 +48,13 @@ final class OrderMediaStatusService
      * @return array{
      *     data: array<int, array{
      *         id: int|string|null,
+     *         uuid: string|null,
      *         schedule_1: string|null,
      *         status_name: string|null,
      *         product_name: string|null,
      *         in_gallery: bool,
-     *         in_game: bool
+     *         in_game: bool,
+     *         customer: array{name:string|null, whatsapp:string|null}|null
      *     }>,
      *     summary: array<string, mixed>,
      *     media_status: array<string, mixed>
@@ -326,17 +328,20 @@ final class OrderMediaStatusService
      * @param array<string, bool> $gameFolders
      * @return array{
      *     id: int|string|null,
+     *     uuid: string|null,
      *     schedule_1: string|null,
      *     status_name: string|null,
      *     product_name: string|null,
      *     in_gallery: bool,
-     *     in_game: bool
+     *     in_game: bool,
+     *     customer: array{name:string|null, whatsapp:string|null}|null
      * }
      */
     private function mapOrder(array $order, array $galleryFolders, array $gameFolders): array
     {
         $id = $order['id'] ?? null;
         $idString = $id === null ? null : (string) $id;
+        $uuid = isset($order['uuid']) && is_string($order['uuid']) ? trim($order['uuid']) : null;
 
         $schedule = $order['schedule_1'] ?? ($order['schedule_one'] ?? null);
         $statusName = null;
@@ -349,13 +354,28 @@ final class OrderMediaStatusService
         $inGallery = $idString !== null && isset($galleryFolders[$idString]);
         $inGame = $idString !== null && isset($gameFolders[$idString]);
 
+        $customer = null;
+        if (isset($order['customer']) && is_array($order['customer'])) {
+            $customerName = isset($order['customer']['name']) ? $this->normalizeString($order['customer']['name']) : null;
+            $customerWhatsapp = isset($order['customer']['whatsapp']) ? $this->normalizeString($order['customer']['whatsapp']) : null;
+
+            if ($customerName !== null || $customerWhatsapp !== null) {
+                $customer = [
+                    'name' => $customerName,
+                    'whatsapp' => $customerWhatsapp,
+                ];
+            }
+        }
+
         return [
             'id' => $id,
+            'uuid' => $uuid,
             'schedule_1' => is_string($schedule) ? $schedule : null,
             'status_name' => $statusName,
             'product_name' => $productName,
             'in_gallery' => $inGallery,
             'in_game' => $inGame,
+            'customer' => $customer,
         ];
     }
 
@@ -722,5 +742,16 @@ final class OrderMediaStatusService
         $trimmed = trim($url);
 
         return $trimmed === '' ? $url : $trimmed;
+    }
+
+    private function normalizeString(mixed $value): ?string
+    {
+        if (!is_scalar($value)) {
+            return null;
+        }
+
+        $string = trim((string) $value);
+
+        return $string === '' ? null : $string;
     }
 }

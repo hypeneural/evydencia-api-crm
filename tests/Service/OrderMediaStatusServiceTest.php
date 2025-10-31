@@ -95,10 +95,15 @@ final class OrderMediaStatusServiceTest extends TestCase
                     'data' => [
                         [
                             'id' => 4490,
+                            'uuid' => '6cc28bfa-e8b7-4868-a7da-4743ab164482',
                             'schedule_1' => '2025-10-28 17:00:00',
                             'status' => ['id' => 2, 'name' => 'Aguardando Retirar'],
                             'items' => [
                                 ['product' => ['bundle' => true, 'name' => 'Experiencia Ho-Ho-Ho']],
+                            ],
+                            'customer' => [
+                                'name' => 'Mara Rubia Soares Gomes',
+                                'whatsapp' => '48996048606',
                             ],
                         ],
                         [
@@ -119,11 +124,16 @@ final class OrderMediaStatusServiceTest extends TestCase
                     'data' => [
                         [
                             'id' => '4494',
+                            'uuid' => '5e5f94b1-77a9-4bc6-8b58-4f6f4d5b2217',
                             'schedule_1' => '2025-10-31 10:00:00',
                             'status' => ['id' => 3, 'name' => 'Sessao Agendada'],
                             'items' => [
                                 ['product' => ['bundle' => false, 'name' => 'Pacote Kids']],
                                 ['product' => ['bundle' => true, 'name' => 'Pacote Premium']],
+                            ],
+                            'customer' => [
+                                'name' => 'Cliente Sem Whatsapp',
+                                'whatsapp' => null,
                             ],
                         ],
                     ],
@@ -169,15 +179,25 @@ final class OrderMediaStatusServiceTest extends TestCase
         self::assertCount(2, $result['data']);
         $first = $result['data'][0];
         self::assertSame(4490, $first['id']);
+        self::assertSame('6cc28bfa-e8b7-4868-a7da-4743ab164482', $first['uuid']);
         self::assertTrue($first['in_game']);
         self::assertFalse($first['in_gallery']);
         self::assertSame('Experiencia Ho-Ho-Ho', $first['product_name']);
+        self::assertSame([
+            'name' => 'Mara Rubia Soares Gomes',
+            'whatsapp' => '48996048606',
+        ], $first['customer']);
 
         $second = $result['data'][1];
         self::assertSame('4494', $second['id']);
+        self::assertSame('5e5f94b1-77a9-4bc6-8b58-4f6f4d5b2217', $second['uuid']);
         self::assertTrue($second['in_gallery']);
         self::assertFalse($second['in_game']);
         self::assertSame('Pacote Premium', $second['product_name']);
+        self::assertSame([
+            'name' => 'Cliente Sem Whatsapp',
+            'whatsapp' => null,
+        ], $second['customer']);
 
         $summary = $result['summary'];
         self::assertSame(2, $summary['total_returned']);

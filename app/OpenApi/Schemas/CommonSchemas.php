@@ -567,11 +567,19 @@ use OpenApi\Annotations as OA;
  *         oneOf={@OA\Schema(type="integer"), @OA\Schema(type="string")},
  *         example=4490
  *     ),
+ *     @OA\Property(property="uuid", type="string", nullable=true, example="6cc28bfa-e8b7-4868-a7da-4743ab164482"),
  *     @OA\Property(property="schedule_1", type="string", nullable=true, example="2025-10-28 17:00:00"),
  *     @OA\Property(property="status_name", type="string", nullable=true, example="Aguardando Retirar"),
  *     @OA\Property(property="product_name", type="string", nullable=true, example="Experiencia Ho-Ho-Ho"),
  *     @OA\Property(property="in_gallery", type="boolean", example=true),
- *     @OA\Property(property="in_game", type="boolean", example=false)
+ *     @OA\Property(property="in_game", type="boolean", example=false),
+ *     @OA\Property(
+ *         property="customer",
+ *         type="object",
+ *         nullable=true,
+ *         @OA\Property(property="name", type="string", nullable=true, example="Mara Rubia Soares Gomes"),
+ *         @OA\Property(property="whatsapp", type="string", nullable=true, example="48996048606")
+ *     )
  * )
  *
  * @OA\Schema(
