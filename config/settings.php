@@ -104,6 +104,13 @@ return [
             'image_mime_types' => array_filter(array_map('trim', explode(',', $_ENV['SCHEDULED_POSTS_IMAGE_MIME_TYPES'] ?? 'image/jpeg,image/png,image/gif,image/webp'))),
             'video_mime_types' => array_filter(array_map('trim', explode(',', $_ENV['SCHEDULED_POSTS_VIDEO_MIME_TYPES'] ?? 'video/mp4,video/mpeg,video/quicktime,video/x-msvideo'))),
         ],
+        'status' => [
+            'gallery_url' => $_ENV['GALLERY_STATUS_URL'] ?? 'https://galeria.fotosdenatal.com/status.php',
+            'game_url' => $_ENV['GAME_STATUS_URL'] ?? 'https://game.fotosdenatal.com/status.php',
+            'cache_ttl' => isset($_ENV['MEDIA_STATUS_CACHE_TTL']) ? (int) $_ENV['MEDIA_STATUS_CACHE_TTL'] : 60,
+            'timeout' => isset($_ENV['MEDIA_STATUS_TIMEOUT']) ? (float) $_ENV['MEDIA_STATUS_TIMEOUT'] : 8.0,
+            'retries' => isset($_ENV['MEDIA_STATUS_RETRIES']) ? max(0, (int) $_ENV['MEDIA_STATUS_RETRIES']) : 1,
+        ],
     ],
     'labels' => [
         'dpi' => (int) ($_ENV['LABEL_DPI'] ?? 300),

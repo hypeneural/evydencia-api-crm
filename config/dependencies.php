@@ -7,6 +7,7 @@ use App\Application\Services\CampaignService;
 use App\Application\Services\LeadOverviewService;
 use App\Application\Services\EventService;
 use App\Application\Services\LabelService;
+use App\Application\Services\OrderMediaStatusService;
 use App\Application\Services\OrderService;
 use App\Application\Services\PasswordService;
 use App\Application\Services\ReportEngine;
@@ -33,6 +34,7 @@ use App\Domain\Repositories\SchoolRepositoryInterface;
 use App\Infrastructure\Cache\RedisRateLimiter;
 use App\Infrastructure\Cache\ScheduledPostCache;
 use App\Infrastructure\Http\EvydenciaApiClient;
+use App\Infrastructure\Http\MediaStatusClient;
 use App\Infrastructure\Http\ZapiClient;
 use App\Infrastructure\Logging\LoggerFactory;
 use App\Infrastructure\Persistence\PdoBlacklistRepository;
@@ -253,6 +255,22 @@ return static function (ContainerBuilder $containerBuilder): void {
                 $container->get(LoggerInterface::class)
             );
         },
+        MediaStatusClient::class => static function (ContainerInterface $container): MediaStatusClient {
+            $media = $container->get(Settings::class)->getMedia();
+            $status = is_array($media['status'] ?? null) ? $media['status'] : [];
+
+            $timeout = isset($status['timeout']) ? (float) $status['timeout'] : 8.0;
+            $retries = isset($status['retries']) ? max(0, (int) $status['retries']) : 1;
+            $cacheTtl = isset($status['cache_ttl']) ? max(1, (int) $status['cache_ttl']) : 60;
+
+            return new MediaStatusClient(
+                $container->get('redis.client'),
+                $container->get(LoggerInterface::class),
+                $timeout,
+                $retries,
+                $cacheTtl
+            );
+        },
         ZapiClient::class => static function (ContainerInterface $container): ZapiClient {
             $settings = $container->get(Settings::class)->getZapi();
 
@@ -365,6 +383,14 @@ return static function (ContainerBuilder $containerBuilder): void {
             return new OrderService(
                 $container->get(EvydenciaApiClient::class),
                 $container->get(OrderRepositoryInterface::class),
+                $container->get(LoggerInterface::class)
+            );
+        },
+        OrderMediaStatusService::class => static function (ContainerInterface $container): OrderMediaStatusService {
+            return new OrderMediaStatusService(
+                $container->get(EvydenciaApiClient::class),
+                $container->get(MediaStatusClient::class),
+                $container->get(Settings::class),
                 $container->get(LoggerInterface::class)
             );
         },

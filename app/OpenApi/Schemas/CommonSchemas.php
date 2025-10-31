@@ -549,6 +549,124 @@ use OpenApi\Annotations as OA;
  * )
  *
  * @OA\Schema(
+ *     schema="OrderMediaStatusItem",
+ *     type="object",
+ *     required={"in_gallery","in_game"},
+ *     @OA\Property(
+ *         property="id",
+ *         oneOf={@OA\Schema(type="integer"), @OA\Schema(type="string")},
+ *         example=4490
+ *     ),
+ *     @OA\Property(property="schedule_1", type="string", nullable=true, example="2025-10-28 17:00:00"),
+ *     @OA\Property(property="status_name", type="string", nullable=true, example="Aguardando Retirar"),
+ *     @OA\Property(property="product_name", type="string", nullable=true, example="Experiencia Ho-Ho-Ho"),
+ *     @OA\Property(property="in_gallery", type="boolean", example=true),
+ *     @OA\Property(property="in_game", type="boolean", example=false)
+ * )
+ *
+ * @OA\Schema(
+ *     schema="OrderMediaBreakdown",
+ *     type="object",
+ *     @OA\Property(property="total_photos", type="integer", example=186),
+ *     @OA\Property(property="total_photos_calculated", type="integer", example=186),
+ *     @OA\Property(property="total_images", type="integer", example=186),
+     * @OA\Property(property="media_por_pasta", type="number", format="float", nullable=true, example=23.25),
+ *     @OA\Property(property="average_photos_per_folder", type="number", format="float", nullable=true, example=23.25),
+ *     @OA\Property(property="pastas_validas", type="integer", example=8),
+ *     @OA\Property(property="pastas_sem_arquivos", type="integer", example=0),
+ *     @OA\Property(property="folder_count", type="integer", example=8),
+ *     @OA\Property(property="orders_with_media", type="integer", example=5),
+ *     @OA\Property(property="orders_without_media", type="integer", example=2),
+ *     @OA\Property(
+ *         property="folder_ids",
+ *         type="array",
+ *         @OA\Items(oneOf={@OA\Schema(type="string"), @OA\Schema(type="integer")})
+ *     )
+ * )
+ *
+ * @OA\Schema(
+ *     schema="OrderMediaStatusSnapshot",
+ *     type="object",
+ *     @OA\Property(property="source_url", type="string", format="uri", example="https://game.fotosdenatal.com/status.php"),
+ *     @OA\Property(property="base_url", type="string", nullable=true, example="https://game.fotosdenatal.com"),
+ *     @OA\Property(property="gerado_em", type="string", nullable=true, example="2025-10-31T14:40:10+00:00"),
+ *     @OA\Property(property="stats", type="object", additionalProperties=true),
+ *     @OA\Property(
+ *         property="computed",
+ *         type="object",
+ *         additionalProperties=true
+ *     ),
+ *     @OA\Property(
+ *         property="pastas",
+ *         type="array",
+ *         @OA\Items(type="object", additionalProperties=true)
+ *     ),
+ *     @OA\Property(
+ *         property="folder_ids",
+ *         type="array",
+ *         @OA\Items(oneOf={@OA\Schema(type="string"), @OA\Schema(type="integer")})
+ *     )
+ * )
+ *
+ * @OA\Schema(
+ *     schema="OrderMediaStatusSummary",
+ *     type="object",
+ *     required={"total_returned","skipped_canceled","session_window","sources","orders","media"},
+ *     @OA\Property(property="total_returned", type="integer", example=2),
+ *     @OA\Property(property="skipped_canceled", type="integer", example=0),
+ *     @OA\Property(
+ *         property="session_window",
+ *         type="array",
+ *         description="Intervalo de datas considerado",
+ *         @OA\Items(type="string", example="2025-09-01")
+ *     ),
+ *     @OA\Property(
+ *         property="sources",
+ *         type="object",
+ *         required={"orders","game_status","gallery_status"},
+ *         @OA\Property(property="orders", type="string", format="uri", example="https://evydencia.com/api/orders/search"),
+ *         @OA\Property(property="game_status", type="string", format="uri", example="https://game.fotosdenatal.com/status.php"),
+ *         @OA\Property(property="gallery_status", type="string", format="uri", example="https://galeria.fotosdenatal.com/status.php")
+ *     ),
+ *     @OA\Property(
+ *         property="orders",
+ *         type="object",
+ *         required={"with_gallery","without_gallery","with_game","without_game"},
+ *         @OA\Property(property="with_gallery", type="integer", example=5),
+ *         @OA\Property(property="without_gallery", type="integer", example=2),
+ *         @OA\Property(property="with_game", type="integer", example=4),
+ *         @OA\Property(property="without_game", type="integer", example=3)
+ *     ),
+ *     @OA\Property(
+ *         property="media",
+ *         type="object",
+ *         @OA\Property(property="gallery", ref="#/components/schemas/OrderMediaBreakdown"),
+ *         @OA\Property(property="game", ref="#/components/schemas/OrderMediaBreakdown")
+ *     )
+ * )
+ *
+ * @OA\Schema(
+ *     schema="OrderMediaStatusResponse",
+ *     allOf={
+ *         @OA\Schema(ref="#/components/schemas/SuccessEnvelope"),
+ *         @OA\Schema(
+ *             @OA\Property(
+ *                 property="media_status",
+ *                 type="object",
+ *                 @OA\Property(property="gallery", ref="#/components/schemas/OrderMediaStatusSnapshot"),
+ *                 @OA\Property(property="game", ref="#/components/schemas/OrderMediaStatusSnapshot")
+ *             ),
+ *             @OA\Property(
+ *                 property="data",
+ *                 type="array",
+ *                 @OA\Items(ref="#/components/schemas/OrderMediaStatusItem")
+ *             ),
+ *             @OA\Property(property="summary", ref="#/components/schemas/OrderMediaStatusSummary")
+ *         )
+ *     }
+ * )
+ *
+ * @OA\Schema(
  *     schema="ScheduledPostListResponse",
  *     allOf={
  *         @OA\Schema(ref="#/components/schemas/SuccessEnvelope"),

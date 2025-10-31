@@ -40,6 +40,7 @@ use App\Actions\HealthCheckAction;
 use App\Actions\Labels\GenerateOrderLabelAction;
 use App\Actions\Leads\GetLeadsOverviewAction;
 use App\Actions\Orders\GetOrderDetailAction;
+use App\Actions\Orders\GetOrderMediaStatusAction;
 use App\Actions\Orders\SearchOrdersAction;
 use App\Actions\Orders\UpdateOrderStatusAction;
 use App\Actions\Reports\ExportReportAction;
@@ -143,6 +144,7 @@ return function (App $app): void {
             $passwords->delete('/{id}', DeletePasswordAction::class);
         });
 
+        $group->get('/orders/media-status', GetOrderMediaStatusAction::class);
         $group->get('/orders/search', SearchOrdersAction::class);
         $group->get('/orders/{uuid}', GetOrderDetailAction::class);
         $group->get('/orders/{uuid}/label', GenerateOrderLabelAction::class);
