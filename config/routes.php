@@ -146,9 +146,11 @@ return function (App $app): void {
 
         $group->get('/orders/media-status', GetOrderMediaStatusAction::class);
         $group->get('/orders/search', SearchOrdersAction::class);
-        $group->get('/orders/{uuid}', GetOrderDetailAction::class);
-        $group->get('/orders/{uuid}/label', GenerateOrderLabelAction::class);
-        $group->put('/orders/{uuid}/status', UpdateOrderStatusAction::class);
+        $uuidPattern = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
+
+        $group->get("/orders/{uuid:{$uuidPattern}}", GetOrderDetailAction::class);
+        $group->get("/orders/{uuid:{$uuidPattern}}/label", GenerateOrderLabelAction::class);
+        $group->put("/orders/{uuid:{$uuidPattern}}/status", UpdateOrderStatusAction::class);
 
         $group->group('/whatsapp', function (RouteCollectorProxy $whatsapp): void {
             $whatsapp->post('/text', SendTextAction::class);
