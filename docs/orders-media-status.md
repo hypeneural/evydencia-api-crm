@@ -7,8 +7,10 @@ Este guia explica como o front-end pode consumir o endpoint que cruza os pedidos
 ## Endpoint
 
 ```
-GET /v1/orders/media-status
+GET https://api.evydencia.com.br/v1/orders/media-status
 ```
+
+> Para ambientes locais de desenvolvimento a rota permanece acessível via `http://localhost/v1/orders/media-status`.
 
 ### Parametros de query
 
@@ -19,6 +21,35 @@ GET /v1/orders/media-status
 | `product_slug` | string | nao | `natal` | Slug do produto. Use `*` para remover o filtro (retorna todos os produtos). |
 
 Se `product_slug` for omitido ou vazio, o back-end utiliza automaticamente o slug `natal`. O valor `*` desativa o filtro e replica as buscas do Postman (todos os produtos no intervalo informado). Valores sao normalizados para minusculo.
+
+---
+
+## Autenticacao e headers
+
+Enviar sempre:
+
+```
+Accept: application/json
+Authorization: <CRM_TOKEN>
+X-API-Key: <APP_API_KEY opcional em ambientes internos>
+```
+
+O `Authorization` utiliza o token da Evydencia (mesmo header exigido pelo endpoint `/v1/orders/search`). Nunca logar ou expor o valor em clientes.
+
+---
+
+## Requisicao de exemplo (producao)
+
+```bash
+curl --location --globoff \
+  'https://api.evydencia.com.br/v1/orders/media-status?session_start=2025-09-01&session_end=2025-10-29&product_slug=natal' \
+  --header 'Accept: application/json' \
+  --header 'Authorization: CjxrF/MigNTVg/VUjTdBkY160yHYTC+L0mNFXUWr0yg='
+```
+
+* Ajuste `session_end` para a data de ontem (a API bloqueia datas futuras).
+* Para remover o filtro por produto, utilize `product_slug=*`.
+* O `Trace-Id` sera retornado nos headers de resposta (Trace-Id e X-Request-Id) para correlacao de logs.
 
 ---
 
@@ -41,7 +72,7 @@ Se `product_slug` for omitido ou vazio, o back-end utiliza automaticamente o slu
    * Guarde `id`, `schedule_1`, `status.name`, `items[].product.name` (primeiro bundle ou item).
 
 2. **Cruzar com midia**
-   * Chame `/v1/orders/media-status` utilizando o mesmo intervalo (`session_start`, `session_end`) e, quando necessario, informe `product_slug`.
+   * Chame `https://api.evydencia.com.br/v1/orders/media-status` utilizando o mesmo intervalo (`session_start`, `session_end`) e, quando necessario, informe `product_slug`.
    * O back-end consulta o CRM externo da Evydencia, aplica paginação automatica (`per_page = 200`, limite de 50 paginas), ignora cancelados, e verifica se o `id` do pedido existe como pasta nos status das plataformas de galeria e game.
 
 3. **Montar a interface**
@@ -112,7 +143,7 @@ Se `product_slug` for omitido ou vazio, o back-end utiliza automaticamente o slu
     "total": 2
   },
   "links": {
-    "self": "http://localhost/v1/orders/media-status?session_start=2025-09-01&session_end=2025-10-31"
+    "self": "https://api.evydencia.com.br/v1/orders/media-status?session_start=2025-09-01&session_end=2025-10-31"
   },
   "trace_id": "...."
 }
@@ -189,10 +220,21 @@ Cada objeto possui:
 
 1. Chamar `/v1/orders/search` com `order[session-start]`, `order[session-end]` e `product[slug]` (natal ou outro slug desejado).  
 2. Remover cancelados (`status.id = 1` ou `status.name = "Pedido Cancelado"`).  
-3. Chamar `/v1/orders/media-status` com os mesmos filtros.  
+3. Chamar `https://api.evydencia.com.br/v1/orders/media-status` com os mesmos filtros.  
 4. Mesclar as informacoes de ambos os retornos (campos ricos do CRM + flags de midia).  
 5. Exibir os KPIs (`summary.kpis`) e contadores (`summary.orders`) no topo do dashboard.  
 6. Para detalhamento, utilizar `media_status.gallery.pastas[]` e `media_status.game.pastas[]`, que trazem a lista de arquivos exatamente como no status.php original.
+
+---
+
+## Diretrizes para o back-end integrador
+
+- **Reuso de token**: utilize o mesmo header `Authorization` que ja autentica contra o CRM externo. O valor deve vir de `CRM_TOKEN` (env/cofre) e jamais ser impresso em logs.  
+- **Timeout e retries**: a API ja aplica retry exponencial e timeout ao CRM e aos status.php. Evite envolver a chamada em novos loops agressivos; monitore `summary.warnings` para capturar degradacao.  
+- **Cache e invalida��o**: o status.php tem cache interno de 60 segundos. Caso precise atualizar imediatamente apos upload, aguarde esse intervalo antes de repetir a consulta para nao saturar as instancias de midia.  
+- **Logs correlacionados**: armazene o `trace_id` retornado (tambem presente nos headers `Trace-Id` e `X-Request-Id`) para investigar ocorrencias nos logs `orders.media_status.*`.  
+- **Tratamento de warnings**: se a resposta vier com `summary.warnings`, degrade a experiencia exibindo os KPIs disponiveis e sinalize a indisponibilidade parcial (por exemplo, `crm_unavailable` ou `crm_token_missing`).  
+- **Extensibilidade**: para novos filtros (ex.: status da sessao, campanhas especificas) alinhe com o time de backend; a API mantem compatibilidade com o contrato de `/v1/orders/search`.
 
 ---
 
