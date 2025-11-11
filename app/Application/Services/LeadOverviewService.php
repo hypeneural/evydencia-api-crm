@@ -83,6 +83,17 @@ final class LeadOverviewService
     }
 
     /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listRecentLeads(LeadOverviewOptions $options, string $traceId): array
+    {
+        $overview = $this->getOverview($options, $traceId);
+        $recentLeads = $overview['data']['recent_leads'] ?? [];
+
+        return is_array($recentLeads) ? $recentLeads : [];
+    }
+
+    /**
      * @param array<int, mixed> $schedules
      * @return array{data: array<string, mixed>, meta: array<string, mixed>}
      */

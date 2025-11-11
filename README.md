@@ -225,6 +225,7 @@ Execute o script em `database/migrations` ou utilize um client MySQL de sua pref
 | Metodo | Rota | Descricao | Filtros |
 |--------|------|-----------|---------|
 | GET    | /v1/orders/search | Busca pedidos no CRM com enriquecimento local. | `page`, `per_page`, `fetch=all`, `sort`, `fields[orders]`, `q`, `order[status]`, `order[created-start|end]`, `customer[email|whatsapp]`, `product[uuid]`. |
+| GET    | /v1/orders/schedule/contacts | Exporta texto `whatsapp;primeiro_nome` a partir de `schedule_1`. | `schedule_start` (padrao `2025-11-15 11:00:00`), `schedule_end` (padrao = agora). Resposta `text/plain`. |
 | GET    | /v1/orders/{uuid} | Retorna pedido individual. | 404 se nao localizado no CRM. |
 | PUT    | /v1/orders/{uuid}/status | Atualiza status no CRM. | Body `status`, opcional `reason`, `comment`. |
 

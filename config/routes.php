@@ -39,6 +39,8 @@ use App\Actions\Docs\ViewDocsAction;
 use App\Actions\HealthCheckAction;
 use App\Actions\Labels\GenerateOrderLabelAction;
 use App\Actions\Leads\GetLeadsOverviewAction;
+use App\Actions\Leads\ListLeadsAction;
+use App\Actions\Orders\ExportOrderScheduleContactsAction;
 use App\Actions\Orders\GetOrderDetailAction;
 use App\Actions\Orders\GetOrderMediaStatusAction;
 use App\Actions\Orders\SearchOrdersAction;
@@ -145,6 +147,7 @@ return function (App $app): void {
         });
 
         $group->get('/orders/media-status', GetOrderMediaStatusAction::class);
+        $group->get('/orders/schedule/contacts', ExportOrderScheduleContactsAction::class);
         $group->get('/orders/search', SearchOrdersAction::class);
         $uuidPattern = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
 
@@ -191,6 +194,7 @@ return function (App $app): void {
         });
 
         $group->group('/leads', function (RouteCollectorProxy $leads): void {
+            $leads->get('', ListLeadsAction::class);
             $leads->get('/overview', GetLeadsOverviewAction::class);
         });
 
